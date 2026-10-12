@@ -1,5 +1,6 @@
 """Builds kids.html (and offline copies) from index.html's shared 3D engine + src/kids-game.js.
-Usage: python3 src/build.py [path/to/three.min.js path/to/Sky.js]  (paths only needed for offline builds)"""
+Usage: python3 src/build.py                       -> kids.html
+       python3 src/build.py tests/vendor/three.min.js tests/vendor/Sky.js -> also the offline single files"""
 import sys, os, re
 here=os.path.dirname(os.path.abspath(__file__)); root=os.path.dirname(here)
 idx=open(os.path.join(root,'index.html'),encoding='utf8').read()
@@ -52,7 +53,8 @@ print('kids.html built')
 if len(sys.argv)>=3:
     three=open(sys.argv[1],encoding='utf8').read().replace('</script','<\\/script'); sky=open(sys.argv[2],encoding='utf8').read()
     inline=f"<script>/* three.js r128 (MIT License) */\n{three}\n</script>\n<script>/* three.js Sky (MIT License) */\n{sky}\n</script>"
-    open(os.path.join(root,'kids-offline.html'),'w',encoding='utf8').write(page(inline,'Kids Safety Games (offline)'))
+    open(os.path.join(root,'kids-offline.html'),'w',encoding='utf8').write(page(inline,'Kids Safety Games (offline)').replace('href="index.html"','href="site-life-offline.html"'))
     o=idx.replace('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>','<script>/* three.js r128 (MIT License) */\n'+three+'\n</script>').replace('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>','<script>/* three.js Sky (MIT License) */\n'+sky+'\n</script>').replace('<title>Site Life 3D</title>','<title>Site Life 3D (offline)</title>')
+    o=o.replace('href="kids.html?world=','href="kids-offline.html?world=')
     open(os.path.join(root,'site-life-offline.html'),'w',encoding='utf8').write(o)
     print('offline builds done')
