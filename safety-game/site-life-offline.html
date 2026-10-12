@@ -50,6 +50,8 @@ input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);
 #guidePanel{position:fixed;left:50%;bottom:164px;transform:translateX(-50%);z-index:5;background:var(--hud);border:1px solid var(--line);border-radius:14px;padding:6px 14px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 #gArrow{display:inline-block;font-size:22px;color:var(--brand);transition:transform .1s linear}
 @media (max-width:600px){#guidePanel{bottom:120px;font-size:13px} #prompt{bottom:166px}}
+.btnlink{display:inline-block;text-decoration:none;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:10px 14px;font-weight:600}
+.btnlink.wa{background:#25D366;border-color:#1da851;color:#06290f}
 .ppe-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .ppe-grid button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;font-size:13px}
 .ppe-grid button .e{font-size:30px}
@@ -473,7 +475,9 @@ const NPCS = [
 ];
 
 // ================== STATE ==================
-let S = null, profile = {name:'', role:null, shirt:SHIRTS[0], skin:SKINS[1], sex:'m'};
+let S = null, profile = {name:'', company:'', role:null, shirt:SHIRTS[0], skin:SKINS[1], sex:'m'};
+// Optional HSE contact baked into the link: ?hse=2348012345678&email=hse@company.com
+const QS=new URLSearchParams(location.search); const HSE_WA=(QS.get('hse')||'').replace(/[^0-9]/g,''); const HSE_MAIL=(QS.get('email')||'').trim();
 let autoQ = true;
 const keys = {}; let joy = null, look = null; let paused = true; let audio = null, muted = false;
 let yaw = 0, pitch = 0.25, firstPerson = false;
@@ -618,7 +622,7 @@ function endGame(){
   const barsOk = BARS.every(b=>S.bars[b.k]>=5);
   const hazOk = S.hazFound/S.hazTotal>=0.8;
   const pass = !S.fatal && barsOk && hazOk && musterOk;
-  const rec = {date:new Date().toLocaleString(), name:profile.name, role:profile.role.name, result:pass?'PASS':'REPLAY', hazards:`${S.hazFound}/${S.hazTotal}`, mistakes:S.mistakes.length, where:[...new Set(S.mistakes.map(x=>x.where))].slice(0,15), fatal:!!S.fatal, t:Date.now()};
+  const rec = {date:new Date().toLocaleString(), name:profile.name, company:profile.company, role:profile.role.name, result:pass?'PASS':'REPLAY', hazards:`${S.hazFound}/${S.hazTotal}`, mistakes:S.mistakes.length, where:[...new Set(S.mistakes.map(x=>x.where))].slice(0,15), fatal:!!S.fatal, t:Date.now()};
   try{const a=JSON.parse(localStorage.getItem('sitelife-log')||'[]'); a.unshift(rec); localStorage.setItem('sitelife-log',JSON.stringify(a.slice(0,50)));}catch(e){}
   pass?chime():buzz();
   const m=openModal(`<h1 style="margin:.1em 0">${S.fatal?'🚑 Shift over':pass?'🎉 Induction passed!':'🔁 Not yet. Replay'}</h1>
@@ -632,8 +636,9 @@ function endGame(){
     ${S.badges.length?`<p>🏅 ${S.badges.map(esc).join(' · ')}</p>`:''}
     <h2 style="margin-top:12px">What to learn</h2>
     ${S.mistakes.length?`<ul>${S.mistakes.map(x=>`<li><b>${esc(x.where)}:</b> ${esc(x.why)}</li>`).join('')}</ul>`:'<p>No mistakes. Excellent!</p>'}
-    ${pass?`<div class="fb" style="text-align:center"><div class="big">🪪 SITE PASS</div><div>${esc(profile.name)} · ${esc(profile.role.name)}</div><div class="muted">${esc(rec.date)}</div><div class="muted">Show this to Security at the gate</div></div>`:''}
-    <p id="hseSend" class="muted">⏳ Sending your result to HSE…</p><div class="row" id="endRow" style="margin-top:12px"><button class="primary" id="again">${pass?'Play again':'Replay (everything reshuffled)'}</button><button id="log">This device's log</button></div><div id="logbox"></div>`);
+    ${pass?`<div class="fb" style="text-align:center"><div class="big">🪪 SITE PASS</div><div>${esc(profile.name)}${profile.company?' · '+esc(profile.company):''} · ${esc(profile.role.name)}</div><div class="muted">${esc(rec.date)}</div><div class="muted">Show this to Security at the gate</div></div>`:''}
+    <p id="hseSend" class="muted">⏳ Sending your result to HSE…</p>
+    ${shareBlock(rec,pass)}<div class="row" id="endRow" style="margin-top:12px"><button class="primary" id="again">${pass?'Play again':'Replay (everything reshuffled)'}</button><button id="log">This device's log</button></div><div id="logbox"></div>`);
   sendResult(rec); showDashButton(m.querySelector('#endRow'));
   m.querySelector('#again').onclick=()=>{closeModal(); showStart();};
   m.querySelector('#log').onclick=()=>{
@@ -746,6 +751,24 @@ function guideUpdate(dt){
 }
 
 
+
+// ================== SHARE RESULT (WhatsApp / email) ==================
+function resultText(rec){
+  return ['SITE LIFE SAFETY INDUCTION RESULT',
+    'Name: '+rec.name, rec.company?('Company: '+rec.company):null, 'Role: '+rec.role,
+    'Result: '+(rec.result==='PASS'?'PASS ✅':'NOT YET (replay needed)'),
+    'Hazards found: '+rec.hazards, 'Mistakes: '+rec.mistakes+(rec.where&&rec.where.length?' ('+rec.where.join('; ')+')':''),
+    'Date: '+rec.date].filter(Boolean).join('\n');
+}
+function shareBlock(rec,pass){
+  const txt=resultText(rec);
+  const wa='https://wa.me/'+(HSE_WA||'')+'?text='+encodeURIComponent(txt);
+  const mail='mailto:'+encodeURIComponent(HSE_MAIL)+'?subject='+encodeURIComponent('Site Life induction result: '+rec.name+' ('+rec.result+')')+'&body='+encodeURIComponent(txt);
+  return `<div class="fb" style="border-left-color:#25D366"><b>📤 Send your result to HSE</b>
+    <div class="row" style="margin-top:8px"><a class="btnlink wa" href="${wa}" target="_blank" rel="noopener">💬 WhatsApp</a><a class="btnlink" href="${mail}" target="_blank" rel="noopener">✉️ Email</a></div>
+    <details style="margin-top:8px"><summary class="muted">Or copy the text</summary><textarea readonly rows="7" style="width:100%;margin-top:6px;font:12px/1.4 system-ui;border-radius:8px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:8px" onclick="this.select()">${esc(txt)}</textarea></details></div>`;
+}
+
 // ================== HSE RESULTS (shared store) ==================
 const cap = (name)=> (window.claude && window.claude.use) ? window.claude.use(name).catch(()=>null) : Promise.resolve(null);
 async function sendResult(rec){
@@ -753,12 +776,12 @@ async function sendResult(rec){
   try{
     const [db,user]=await Promise.all([cap('db'),cap('user')]);
     const uid = user ? await user.id() : null;
-    if(!db || !uid){ show('ℹ️ Result saved on this device only (open the game from the company link to send it to HSE).'); return; }
+    if(!db || !uid){ show('ℹ️ Use the WhatsApp or email button below to send your result to HSE.'); return; }
     const ref=db.doc('results/'+uid); const snap=await ref.get(); const old=snap.exists?snap.data():{};
     const attempts=[...(old.attempts||[]), rec].slice(-20);
     await ref.set({name:rec.name, role:rec.role, last:rec, attempts, passedEver: !!(old.passedEver || rec.result==='PASS'), updatedAt:Date.now()});
     show('✅ Your result has been sent to HSE.');
-  }catch(e){ show(e && e.code==='invalid_argument' ? '⚠️ Not sent to HSE: your link does not allow saving. Ask HSE for "Contributor" access.' : '⚠️ Could not send your result to HSE right now. It is saved on this device.'); }
+  }catch(e){ show(e && e.code==='invalid_argument' ? 'ℹ️ This link cannot save results automatically. Use the WhatsApp or email button below to send your result to HSE.' : '⚠️ Could not send your result to HSE automatically. Use the WhatsApp or email button below.'); }
 }
 let dashUnsub=null;
 async function openDashboard(){
@@ -1695,7 +1718,8 @@ function showStart(){
   setHud(false); started=false; profile.role=null; newGame(); paused=true;
   const m=openModal(`<h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
     <p class="muted">The safety induction you <b>play</b>, not a paper you tick. Walk the compound, make the right calls, spot the hazards, and survive your first shift.<br>Demo site: <i>Acme Manufacturing, Ikeja</i>.</p>
-    <p><b>Your name</b></p><input id="nm" placeholder="e.g. Tunde" maxlength="16" value="${esc(profile.name)}">
+    <p><b>Your name</b></p><input id="nm" placeholder="e.g. Tunde Bakare" maxlength="40" value="${esc(profile.name)}">
+    <p><b>Company</b> <span class="muted">(optional)</span></p><input id="co" placeholder="e.g. ABC Contractors Ltd" maxlength="60" value="${esc(profile.company)}">
     <p><b>Your character</b></p>
     <div class="row" id="sex"><button data-x="m" class="${profile.sex==='m'?'primary':''}">👨🏾 Man</button><button data-x="f" class="${profile.sex==='f'?'primary':''}">👩🏾 Woman</button></div>
     <p class="muted" style="margin:.6em 0 .3em">Shirt colour and skin tone</p>
@@ -1715,7 +1739,7 @@ function showStart(){
       if(++n>12){ clearInterval(t); m.querySelector('#roletask').textContent='📱 Task: '+profile.role.task; m.querySelector('#start').disabled=false; m.querySelector('#spin').disabled=false; chime(); } },90);
   };
   m.querySelector('#start').onclick=()=>{
-    profile.name=(m.querySelector('#nm').value.trim()||'Guest').slice(0,16);
+    profile.name=(m.querySelector('#nm').value.trim()||'Guest').slice(0,40); profile.company=m.querySelector('#co').value.trim().slice(0,60);
     G.resetDynamic(); started=true; closeModal(); setHud(true);
     toast('🛵 The okada has dropped you at the Main Gate. Your HSE Escort will show you round. Follow the arrows.');
     setTimeout(()=>toast('📱 Tap "Tasks" to see what to do. Follow the yellow ! markers.'),2600);
