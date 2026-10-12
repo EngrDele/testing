@@ -1,7 +1,9 @@
 #!/bin/sh
-# Site Life - starts a local web server for the games on port 8080 (Mac/Linux).
+# Site Life - runs the games + results server on this computer (port 8080). Mac/Linux.
 cd "$(dirname "$0")"
-echo "Site Life games are running at: http://localhost:8080  (Ctrl+C to stop)"
-if command -v python3 >/dev/null 2>&1; then exec python3 -m http.server 8080
-elif command -v npx >/dev/null 2>&1; then exec npx --yes http-server -p 8080 -c-1
-else echo "Install Python 3 first: https://www.python.org/downloads/"; fi
+[ -f hse-key.txt ] || (od -An -N6 -tx1 /dev/urandom | tr -d ' \n' > hse-key.txt)
+export HSE_KEY="$(cat hse-key.txt)" PORT=8080
+echo "Games:         http://localhost:8080"
+echo "HSE dashboard: http://localhost:8080/hse?key=$HSE_KEY"
+echo "Share port 8080 with VS Code (PORTS tab > Forward a Port > 8080 > Public). Ctrl+C to stop."
+exec python3 server/sitelife_server.py

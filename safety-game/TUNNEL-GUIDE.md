@@ -9,7 +9,8 @@ The games are plain web files. You run a small web server on your computer and a
 1. Download the files: on GitHub, open `EngrDele/testing`, switch to the branch `claude/lagos-safety-game-research-cq4tb4`, then choose **Code → Download ZIP**. Unzip it.
 2. Open the `safety-game` folder.
 3. **Windows:** double-click **`START-SERVER.bat`**. **Mac/Linux:** run `./start-server.sh`.
-4. Check it works: open `http://localhost:8080` in your browser. You should see the game selector.
+4. Your browser opens the **HSE dashboard** (`http://localhost:8080/hse?key=…`). Bookmark it: every player's result arrives here. The key is saved in `hse-key.txt` and is never shared online.
+5. Check the games: open `http://localhost:8080`. You should see the game selector.
 
 If it says Python is missing, install Python from python.org and tick **"Add python.exe to PATH"** during setup.
 
@@ -46,7 +47,7 @@ If it says Python is missing, install Python from python.org and tick **"Add pyt
 Write the WhatsApp number in international format without the `+`.
 
 ## Good to know
-- **Results:** players send their result with the **WhatsApp or email button** at the end of the game. The automatic HSE dashboard only works on the claude.ai link.
+- **Results:** every finished game is saved on your PC automatically and shows on your HSE dashboard (`http://localhost:8080/hse?key=…`). Players also get the WhatsApp/email button. Results are stored in `server/data/results.jsonl`.
 - **Many players at once:** every player downloads about 1 MB from your computer, so a slow office upload speed will be slow for big groups. For a full rollout, use Cloudflare Pages (see `HOSTING-OPTIONS.md`).
 - **Security:** anyone with the link can open the games, so share it only with the people who need it. Stop the tunnel when testing is finished.
 - **Power:** use a UPS or keep the PC on the generator, because a power cut stops the link.

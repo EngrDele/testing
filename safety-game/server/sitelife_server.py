@@ -69,7 +69,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         u = urlparse(self.path)
-        if u.path.startswith(("/server/", "/src/", "/.git")):  # never serve server code or data
+        if u.path.startswith(("/server/", "/src/", "/.git")) or u.path.endswith(("hse-key.txt", ".bat", ".sh", ".gitignore")):  # never serve server code or data
             return self.send(404, "Not found", "text/plain")
         if u.path in ("/hse", "/hse/"):
             q = parse_qs(u.query)

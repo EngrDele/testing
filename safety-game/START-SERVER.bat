@@ -1,15 +1,22 @@
 @echo off
-REM Site Life - starts a local web server for the games on port 8080.
-REM Keep this window open while people are playing.
+REM Site Life - runs the games + results server on this PC (port 8080).
+REM Keep this window open while people are playing. Then share port 8080 with VS Code (see TUNNEL-GUIDE.md).
 cd /d "%~dp0"
+if not exist hse-key.txt (echo %RANDOM%%RANDOM%%RANDOM%> hse-key.txt)
+set /p HSE_KEY=<hse-key.txt
+set HSE_KEY=%HSE_KEY: =%
+set PORT=8080
 echo.
-echo  Site Life games are running at:  http://localhost:8080
-echo  Now open a tunnel to port 8080 (see TUNNEL-GUIDE.md).
-echo  Close this window to stop.
+echo  ===========================================================
+echo   Site Life is running on this PC:  http://localhost:8080
+echo   HSE dashboard (only for you):     http://localhost:8080/hse?key=%HSE_KEY%
+echo   Next: in VS Code, PORTS tab ^> Forward a Port ^> 8080 ^> set Public
+echo   Close this window to stop.
+echo  ===========================================================
 echo.
-where python >nul 2>nul && (python -m http.server 8080 & goto :eof)
-where py >nul 2>nul && (py -m http.server 8080 & goto :eof)
-where npx >nul 2>nul && (npx --yes http-server -p 8080 -c-1 & goto :eof)
-echo  Could not find Python or Node.js.
-echo  Install Python from https://www.python.org/downloads/ (tick "Add to PATH"), then run this again.
+start "" "http://localhost:8080/hse?key=%HSE_KEY%"
+where python >nul 2>nul && (python server\sitelife_server.py & goto :eof)
+where py >nul 2>nul && (py server\sitelife_server.py & goto :eof)
+echo  Python was not found.
+echo  Install it from https://www.python.org/downloads/ and tick "Add python.exe to PATH", then run this again.
 pause
