@@ -385,7 +385,7 @@ function endGame(){
   const barsOk = BARS.every(b=>S.bars[b.k]>=5);
   const hazOk = S.hazFound/S.hazTotal>=0.8;
   const pass = !S.fatal && barsOk && hazOk && musterOk;
-  const rec = {date:new Date().toLocaleString(), name:profile.name, role:profile.role.name, result:pass?'PASS':'REPLAY', hazards:`${S.hazFound}/${S.hazTotal}`, mistakes:S.mistakes.length};
+  const rec = {date:new Date().toLocaleString(), name:profile.name, role:profile.role.name, result:pass?'PASS':'REPLAY', hazards:`${S.hazFound}/${S.hazTotal}`, mistakes:S.mistakes.length, where:[...new Set(S.mistakes.map(x=>x.where))].slice(0,15), fatal:!!S.fatal, t:Date.now()};
   try{const a=JSON.parse(localStorage.getItem('sitelife-log')||'[]'); a.unshift(rec); localStorage.setItem('sitelife-log',JSON.stringify(a.slice(0,50)));}catch(e){}
   pass?chime():buzz();
   const m=openModal(`<h1 style="margin:.1em 0">${S.fatal?'🚑 Shift over':pass?'🎉 Induction passed!':'🔁 Not yet. Replay'}</h1>
@@ -400,7 +400,8 @@ function endGame(){
     <h2 style="margin-top:12px">What to learn</h2>
     ${S.mistakes.length?`<ul>${S.mistakes.map(x=>`<li><b>${esc(x.where)}:</b> ${esc(x.why)}</li>`).join('')}</ul>`:'<p>No mistakes. Excellent!</p>'}
     ${pass?`<div class="fb" style="text-align:center"><div class="big">🪪 SITE PASS</div><div>${esc(profile.name)} · ${esc(profile.role.name)}</div><div class="muted">${esc(rec.date)}</div><div class="muted">Show this to Security at the gate</div></div>`:''}
-    <div class="row" style="margin-top:12px"><button class="primary" id="again">${pass?'Play again':'Replay (everything reshuffled)'}</button><button id="log">HSE log</button></div><div id="logbox"></div>`);
+    <p id="hseSend" class="muted">⏳ Sending your result to HSE…</p><div class="row" id="endRow" style="margin-top:12px"><button class="primary" id="again">${pass?'Play again':'Replay (everything reshuffled)'}</button><button id="log">This device's log</button></div><div id="logbox"></div>`);
+  sendResult(rec); showDashButton(m.querySelector('#endRow'));
   m.querySelector('#again').onclick=()=>{closeModal(); showStart();};
   m.querySelector('#log').onclick=()=>{
     let a=[]; try{a=JSON.parse(localStorage.getItem('sitelife-log')||'[]');}catch(e){}
@@ -509,6 +510,59 @@ function guideUpdate(dt){
   if(dP>380){ e.x=p.x+(goal[0]-p.x)*.4; e.y=p.y+(goal[1]-p.y)*.4; }
   else if((dP<170 || behind) && dG>12){ const sp=(S.alarm||behind?175:105)*dt, k=Math.min(1,sp/dG); const dx=(goal[0]-e.x)*k, dy=(goal[1]-e.y)*k; e.x+=dx; e.y+=dy; e.face=Math.atan2(-dx,-dy); e.step+=dt*9; e.moving=true; }
   else { e.face=Math.atan2(-(p.x-e.x),-(p.y-e.y)); }
+}
+
+
+// ================== HSE RESULTS (shared store) ==================
+const cap = (name)=> (window.claude && window.claude.use) ? window.claude.use(name).catch(()=>null) : Promise.resolve(null);
+async function sendResult(rec){
+  const el=()=>document.getElementById('hseSend'); const show=(t)=>{ if(el()) el().textContent=t; };
+  try{
+    const [db,user]=await Promise.all([cap('db'),cap('user')]);
+    const uid = user ? await user.id() : null;
+    if(!db || !uid){ show('ℹ️ Result saved on this device only (open the game from the company link to send it to HSE).'); return; }
+    const ref=db.doc('results/'+uid); const snap=await ref.get(); const old=snap.exists?snap.data():{};
+    const attempts=[...(old.attempts||[]), rec].slice(-20);
+    await ref.set({name:rec.name, role:rec.role, last:rec, attempts, passedEver: !!(old.passedEver || rec.result==='PASS'), updatedAt:Date.now()});
+    show('✅ Your result has been sent to HSE.');
+  }catch(e){ show(e && e.code==='invalid_argument' ? '⚠️ Not sent to HSE: your link does not allow saving. Ask HSE for "Contributor" access.' : '⚠️ Could not send your result to HSE right now. It is saved on this device.'); }
+}
+let dashUnsub=null;
+async function openDashboard(){
+  const [db,user]=await Promise.all([cap('db'),cap('user')]);
+  const m=openModal(`<h2>📊 HSE Dashboard</h2><p class="muted">Everyone who has played this induction from the company link. Updates live.</p><div id="dashBody"><p class="muted">Loading…</p></div>
+    <div class="row" style="margin-top:12px"><button id="csv">⬇️ Export CSV</button><button class="primary" id="dclose">Close</button></div><div id="csvMsg" class="muted"></div>`);
+  const close=()=>{ if(dashUnsub){ dashUnsub(); dashUnsub=null; } closeModal(); if(!started || S.over) showStart(); };
+  m.querySelector('#dclose').onclick=close;
+  let rows=[];
+  if(!db){ m.querySelector('#dashBody').innerHTML='<p>The results store is not available in this view. Open the game from its claude.ai link.</p>'; m.querySelector('#csv').disabled=true; return; }
+  const render=async()=>{
+    const body=m.querySelector('#dashBody'); if(!body) return;
+    if(!rows.length){ body.innerHTML='<p>No results yet. Share the game link with new staff and visitors; their results will appear here.</p>'; return; }
+    const ps = user ? await user.profiles(rows.map(r=>r.id)) : {};
+    const total=rows.length, passed=rows.filter(r=>r.d.last&&r.d.last.result==='PASS').length;
+    const mc={}; rows.forEach(r=>(r.d.attempts||[]).forEach(a=>(a.where||[]).forEach(w=>mc[w]=(mc[w]||0)+1)));
+    const top=Object.entries(mc).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    body.innerHTML=`<div class="row" style="margin-bottom:10px"><span class="pill">👥 ${total} players</span><span class="pill">✅ ${passed} cleared</span><span class="pill">📈 ${Math.round(passed/total*100)}% pass rate</span></div>
+      ${top.length?`<p style="margin:.4em 0"><b>Most common mistakes</b></p><ul style="margin:0 0 10px">${top.map(([w,n])=>`<li>${esc(w)}: ${n}</li>`).join('')}</ul>`:''}
+      <div style="overflow-x:auto"><table><tr><th>Name</th><th>Account</th><th>Role</th><th>Latest</th><th>Tries</th><th>Hazards</th><th>Mistakes</th><th>When</th></tr><tbody id="dt"></tbody></table></div>`;
+    const tb=body.querySelector('#dt');
+    rows.sort((a,b)=>(b.d.updatedAt||0)-(a.d.updatedAt||0)).forEach(r=>{ const d=r.d, l=d.last||{}; const tr=document.createElement('tr');
+      [d.name||'', (ps[r.id]&&ps[r.id].name)||'—', d.role||'', (l.result==='PASS'?'✅ PASS':'🔁 REPLAY'), String((d.attempts||[]).length), l.hazards||'', String(l.mistakes??''), l.date||''].forEach(v=>{ const td=document.createElement('td'); td.textContent=v; tr.appendChild(td); }); tb.appendChild(tr); });
+  };
+  dashUnsub=db.collection('results').onSnapshot(snap=>{ rows=snap.docs.filter(d=>d.exists).map(d=>({id:d.id,d:d.data()})); render(); }, err=>{ const b=m.querySelector('#dashBody'); if(b) b.innerHTML='<p>Could not load results ('+esc(err.code)+').</p>'; });
+  m.querySelector('#csv').onclick=async()=>{
+    const dl=await cap('downloads'); const msg=m.querySelector('#csvMsg');
+    if(!dl){ msg.textContent='Download is not available in this view.'; return; }
+    const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    const lines=[['Name','Role','Result','Tries','Hazards found','Mistakes','Mistake areas','Date'].map(q).join(',')];
+    rows.forEach(r=>{ const d=r.d,l=d.last||{}; lines.push([d.name,d.role,l.result,(d.attempts||[]).length,l.hazards,l.mistakes,(l.where||[]).join('; '),l.date].map(q).join(',')); });
+    try{ await dl.save({filename:'site-life-induction-results.csv', data:lines.join('\n')}); msg.textContent='Saved.'; }catch(e){ msg.textContent = e.code==='declined'?'':'Could not save the file.'; }
+  };
+}
+async function showDashButton(container){
+  const user=await cap('user'); if(!user) return; const ok=await user.canEdit(); if(!ok || !container) return;
+  const b=document.createElement('button'); b.textContent='📊 HSE Dashboard'; b.onclick=()=>{ closeModal(); openDashboard(); }; container.appendChild(b);
 }
 
 // ================== COLLISION ==================
@@ -1416,8 +1470,9 @@ function showStart(){
     <div class="row" style="margin-top:6px">${SKINS.map(c=>`<button class="sw ${c===profile.skin?'on':''}" data-s="${c}" style="background:${c}" aria-label="skin tone"></button>`).join('')}</div>
     <p><b>Role lottery 🎲</b> <span class="muted">Like Lagos Life's birth lottery, you don't choose.</span></p>
     <div class="big" id="rolebox">🎲 ?</div><p class="muted" id="roletask"></p>
-    <div class="row"><button id="spin">Spin role</button><button class="primary" id="start" disabled>Start shift ▶</button></div>
+    <div class="row" id="startRow"><button id="spin">Spin role</button><button class="primary" id="start" disabled>Start shift ▶</button></div>
     <p class="muted" style="font-size:.85rem;margin-top:12px">🎮 <b>Computer:</b> WASD to walk, drag the mouse to look, E to interact, V to switch first/third person.<br>📱 <b>Phone:</b> drag the left side of the screen to walk, drag the right side to look, and tap the green button to interact.</p>`);
+  showDashButton(m.querySelector('#startRow'));
   m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{profile.sex=b.dataset.x; m.querySelectorAll('[data-x]').forEach(x=>x.classList.toggle('primary',x===b));});
   m.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{profile.shirt=b.dataset.c; m.querySelectorAll('[data-c]').forEach(x=>x.classList.toggle('on',x===b));});
   m.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{profile.skin=b.dataset.s; m.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));});
