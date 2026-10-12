@@ -46,6 +46,10 @@ input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);
 #phoneBtn{right:106px;bottom:30px}
 #camBtn{right:106px;bottom:86px}
 #autoBtn{right:106px;bottom:142px;font-size:13px}
+#guideBtn{right:106px;bottom:198px;font-size:13px}
+#guidePanel{position:fixed;left:50%;bottom:164px;transform:translateX(-50%);z-index:5;background:var(--hud);border:1px solid var(--line);border-radius:14px;padding:6px 14px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+#gArrow{display:inline-block;font-size:22px;color:var(--brand);transition:transform .1s linear}
+@media (max-width:600px){#guidePanel{bottom:120px;font-size:13px} #prompt{bottom:166px}}
 .ppe-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .ppe-grid button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;font-size:13px}
 .ppe-grid button .e{font-size:30px}
@@ -102,6 +106,8 @@ table{width:100%;border-collapse:collapse;font-size:.82rem}td,th{border-bottom:1
 <button id="phoneBtn" class="fbtn hidden">📱 Tasks</button>
 <button id="camBtn" class="fbtn hidden">👁️ View</button>
 <button id="autoBtn" class="fbtn hidden">⚡ Auto: ON</button>
+<button id="guideBtn" class="fbtn hidden">🧭 Guide: ON</button>
+<div id="guidePanel" class="hidden"><span id="gArrow">⬆</span><span id="gText"></span></div>
 <button id="muteBtn" class="fbtn hidden">🔊</button>
 <div id="timer" class="hidden"></div>
 <div id="alarmv" class="alarmv hidden"></div>
@@ -405,11 +411,12 @@ function openPhone(){
   const done = Object.keys(S.results).length;
   const m=openModal(`<h2>📱 My Phone · Tasks</h2><p class="muted">${esc(profile.role.icon)} <b>${esc(profile.role.name)}</b>: ${esc(profile.role.task)}</p>
     <p><span class="pill">✅ ${done}/${ZONES.length} areas</span> <span class="pill">🔎 ${S.hazFound}/${S.hazTotal} hazards reported</span></p>
-    <ul class="tasks">${ZONES.map(z=>{const r=S.results[z.id]; return `<li><span>${r===true?'✅':r===false?'⚠️':'⬜'}</span><span>${esc(z.hint)}</span></li>`}).join('')}
+    <ul class="tasks">${ZONES.map(z=>{const r=S.results[z.id]; return `<li><span>${r===true?'✅':r===false?'⚠️':'⬜'}</span><span style="flex:1">${esc(z.hint)}</span>${r===undefined?`<button data-go="${z.id}" style="padding:4px 10px;font-size:12px">📍 Show me</button>`:''}</li>`}).join('')}
     <li><span>🔎</span><span>Find and report hidden hazards around the compound. Look for objects on the ground and against walls.</span></li></ul>
     <p class="muted">🚨 Emergency: 112 · Site HSE: ext. 222</p>
     <p class="muted">Controls: WASD / arrow keys to walk, drag the mouse (or the right side of the screen) to look around, E / Space or the green button to interact, V or 👁️ to switch between first and third person. On a phone, drag the left side of the screen to walk.</p>
     <button class="primary" id="cl">Close</button>`);
+  m.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ guidePick=b.dataset.go; guideOn=true; $('guideBtn').textContent='🧭 Guide: ON'; if(S.guide) S.guide.key=''; closeModal(); });
   m.querySelector('#cl').onclick=closeModal;
 }
 
@@ -449,6 +456,59 @@ function ppeSelect(onDone){
       <div style="margin-top:10px"><button class="primary" id="cont">Continue</button></div>`;
     m.querySelector('#cont').onclick=()=>{ closeModal(); onDone(ok); toast('🦺 You are now wearing: '+(PPE_ITEMS.filter(i=>!i.bad&&worn[i.k]).map(i=>i.n).join(', ')||'nothing!')); };
   };
+}
+
+
+// ================== GUIDE / ESCORT ==================
+let guideOn = true, guidePick = null;
+const ROUTE = ['gate','reception','admin','canteen','workshop','chemical','diesel','forklift','electrical','generator','warehouse','loading','carpark','muster'];
+const TARGET_PT = {forklift:[670,500], carpark:[1290,960], muster:[MUSTER.x,MUSTER.y]};
+const ZNAME = {forklift:'Zebra crossing (forklift lane)', carpark:'Car Park', muster:'Muster Point'};
+function nextTask(){
+  if(S.alarm && !S.alarm.done) return {id:'muster', name:'MUSTER POINT', x:MUSTER.x, y:MUSTER.y};
+  const pick = guidePick && !(guidePick in S.results) ? guidePick : ROUTE.find(id=>!(id in S.results));
+  if(!pick) return null;
+  const z=ZONES.find(z=>z.id===pick), pt=TARGET_PT[pick]||[z.x,z.y];
+  return {id:pick, name:ZNAME[pick]||z.name, x:pt[0], y:pt[1]};
+}
+const GS=20, GW=Math.ceil(W/GS), GH=Math.ceil(H/GS); let GRID=null, GRID_GATE=null;
+function buildGrid(){ const sol=solids(); GRID=new Uint8Array(GW*GH); for(let y=0;y<GH;y++) for(let x=0;x<GW;x++) GRID[y*GW+x]=blocked(x*GS+GS/2,y*GS+GS/2,15,sol)?1:0; GRID_GATE=S.gateOpen; }
+function cellCost(x,y){ const cx=x*GS+GS/2, cy=y*GS+GS/2; if(cy>LANE.y1-8 && cy<LANE.y2+8 && cx>LANE.x1 && cx<LANE.x2) return CROSS.some(c=>cx>c.x1 && cx<c.x2)?1:40; return 1; }
+function freeCell(cx,cy){ if(!GRID[cy*GW+cx]) return [cx,cy]; for(let r=1;r<6;r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ const x=cx+dx,y=cy+dy; if(x>=0&&y>=0&&x<GW&&y<GH&&!GRID[y*GW+x]) return [x,y]; } return [cx,cy]; }
+function findPath(sx,sy,tx,ty){
+  if(!GRID||GRID_GATE!==S.gateOpen) buildGrid();
+  const [ax,ay]=freeCell(clamp(Math.floor(sx/GS),0,GW-1),clamp(Math.floor(sy/GS),0,GH-1)), [bx,by]=freeCell(clamp(Math.floor(tx/GS),0,GW-1),clamp(Math.floor(ty/GS),0,GH-1));
+  const N=GW*GH, g=new Float32Array(N).fill(1e9), from=new Int32Array(N).fill(-1), closed=new Uint8Array(N), heap=[];
+  const h=(i)=>{ const x=i%GW,y=(i/GW)|0; return Math.hypot(x-bx,y-by); };
+  const push=(i,f)=>{ heap.push([f,i]); let k=heap.length-1; while(k>0){ const pk=(k-1)>>1; if(heap[pk][0]<=heap[k][0]) break; [heap[pk],heap[k]]=[heap[k],heap[pk]]; k=pk; } };
+  const pop=()=>{ const top=heap[0], last=heap.pop(); if(heap.length){ heap[0]=last; let k=0; for(;;){ const l=2*k+1,r=l+1; let m=k; if(l<heap.length&&heap[l][0]<heap[m][0]) m=l; if(r<heap.length&&heap[r][0]<heap[m][0]) m=r; if(m===k) break; [heap[m],heap[k]]=[heap[k],heap[m]]; k=m; } } return top; };
+  const start=ay*GW+ax, goal=by*GW+bx; g[start]=0; push(start,h(start));
+  while(heap.length){ const [,i]=pop(); if(closed[i]) continue; closed[i]=1; if(i===goal) break; const x=i%GW, y=(i/GW)|0;
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ if(!dx&&!dy) continue; const nx=x+dx, ny=y+dy; if(nx<0||ny<0||nx>=GW||ny>=GH) continue; const j=ny*GW+nx; if(GRID[j]||closed[j]) continue;
+      if(dx&&dy && (GRID[y*GW+nx]||GRID[ny*GW+x])) continue;
+      const ng=g[i]+(dx&&dy?1.414:1)*cellCost(nx,ny); if(ng<g[j]){ g[j]=ng; from[j]=i; push(j,ng+h(j)); } } }
+  if(from[goal]<0 && goal!==start) return null;
+  const cells=[]; for(let i=goal;i!==-1;i=from[i]) cells.push([(i%GW)*GS+GS/2,((i/GW)|0)*GS+GS/2]); cells.reverse();
+  cells[0]=[sx,sy]; cells.push([tx,ty]); return cells;
+}
+function pathLen(pth){ let L=0; for(let i=1;i<pth.length;i++) L+=dist(pth[i-1][0],pth[i-1][1],pth[i][0],pth[i][1]); return L; }
+function guideUpdate(dt){
+  const p=S.p, T=guideOn? nextTask() : null; S.guide=S.guide||{t:0,key:'',path:null,esc:{x:200,y:1150,step:0,face:Math.PI,moving:false},said:''};
+  const gd=S.guide; gd.target=T; gd.t-=dt;
+  if(!T){ gd.path=null; return; }
+  const key=T.id+'|'+S.gateOpen;
+  if(key!==gd.key || gd.t<=0 || !gd.path){ gd.path=findPath(p.x,p.y,T.x,T.y); gd.key=key; gd.t=.6; }
+  if(gd.said!==T.id){ gd.said=T.id; if(T.id==='muster' && S.alarm) toast('🦺 HSE Escort: "Follow me to the MUSTER POINT, quick quick!"'); else toast(`🦺 HSE Escort: "Follow me. Next stop: ${T.name}."`); }
+  // escort walks ahead along the path
+  const e=gd.esc, pth=gd.path; if(!pth) return;
+  let acc=0, goal=pth[pth.length-1];
+  for(let i=1;i<pth.length;i++){ acc+=dist(pth[i-1][0],pth[i-1][1],pth[i][0],pth[i][1]); if(acc>=70){ goal=pth[i]; break; } }
+  const dP=dist(e.x,e.y,p.x,p.y), dG=dist(e.x,e.y,goal[0],goal[1]);
+  e.moving=false;
+  const behind = dist(e.x,e.y,T.x,T.y) > dist(p.x,p.y,T.x,T.y)+30;
+  if(dP>380){ e.x=p.x+(goal[0]-p.x)*.4; e.y=p.y+(goal[1]-p.y)*.4; }
+  else if((dP<170 || behind) && dG>12){ const sp=(S.alarm||behind?175:105)*dt, k=Math.min(1,sp/dG); const dx=(goal[0]-e.x)*k, dy=(goal[1]-e.y)*k; e.x+=dx; e.y+=dy; e.face=Math.atan2(-dx,-dy); e.step+=dt*9; e.moving=true; }
+  else { e.face=Math.atan2(-(p.x-e.x),-(p.y-e.y)); }
 }
 
 // ================== COLLISION ==================
@@ -543,6 +603,7 @@ function update(dt){
   }
   if(S.bars.health<=0 && !S.fatal){ S.fatal='Your health reached zero.'; endGame(); return; }
   if(S.bars.lungs<=0 && !S.fatal){ S.fatal='You collapsed from breathing smoke or fumes.'; endGame(); return; }
+  guideUpdate(dt);
   const near = interactables().filter(i=>dist(p.x,p.y,i.x,i.y)<i.r).sort((a,b)=>dist(p.x,p.y,a.x,a.y)-dist(p.x,p.y,b.x,b.y))[0];
   S.near = near;
   if(autoQ && near && near.auto && !paused && dist(p.x,p.y,near.x,near.y)<near.r*.75){ near.run(); return; }
@@ -1171,9 +1232,16 @@ function initThree(){
   // alarm beacons on buildings
   const beacons=[]; for(const b of BUILD.filter(b=>b.door)){ const m=new THREE.Mesh(new THREE.SphereGeometry(.12,10,8),new THREE.MeshBasicMaterial({color:'#3a1010'})); m.position.set(X(b.door.x),3.0,Z(b.door.y)+(b.door.y<b.y?.15:-.15)); scene.add(m); beacons.push(m); }
 
+  // guide visuals
+  const chev=new THREE.Shape([[-.35,-.25],[0,.15],[.35,-.25],[.35,-.05],[0,.35],[-.35,-.05]].map(([x,y])=>new THREE.Vector2(x,y)));
+  const chevGeo=new THREE.ShapeGeometry(chev); chevGeo.rotateX(-Math.PI/2);
+  const arrows=new THREE.InstancedMesh(chevGeo,new THREE.MeshBasicMaterial({color:'#ffd21a',transparent:true,opacity:.9,depthWrite:false,toneMapped:false}),60); arrows.frustumCulled=false; arrows.count=0; scene.add(arrows);
+  const beamT=tex(mkCanvas(16,128,(c)=>{ const g=c.createLinearGradient(0,0,0,128); g.addColorStop(0,'rgba(255,215,40,0)'); g.addColorStop(1,'rgba(255,215,40,.75)'); c.fillStyle=g; c.fillRect(0,0,16,128); }),1,1);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,14,20,1,true),new THREE.MeshBasicMaterial({map:beamT,transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,toneMapped:false})); beam.visible=false; scene.add(beam);
+  const escort=makeHuman({sex:'m',skin:'#3b2416',top:'#1f3a5f',bottom:'#1f2a3a',outfit:'coverall',longSleeve:true,vest:true,vestColor:'#ff7a00',hat:'hard',hatColor:'#1f6fd1',boots:true,goggles:false,beard:true,label:'HSE Escort · follow me'}); escort.visible=false; scene.add(escort);
   flushInst(scene);
   const dyn={markers:[],items:[],workers:[],bag:null};
-  G={renderer,scene,camera,hemi,sun,alarmLight,fireLight,barrier,fork,van,beepS,npcs,player,rain,puddles,smoke,flames,beacons,glass,yardMat,streetMat,shake:0,dyn,SKIES,setSky,skyMode:'day',envRT:initEnv,
+  G={arrows,beam,escort,renderer,scene,camera,hemi,sun,alarmLight,fireLight,barrier,fork,van,beepS,npcs,player,rain,puddles,smoke,flames,beacons,glass,yardMat,streetMat,shake:0,dyn,SKIES,setSky,skyMode:'day',envRT:initEnv,
     resetDynamic(){
       dyn.markers.forEach(m=>{scene.remove(m.s); scene.remove(m.ring);}); dyn.items.forEach(i=>scene.remove(i.g)); dyn.workers.forEach(w=>scene.remove(w)); if(dyn.bag) scene.remove(dyn.bag);
       dyn.markers=[]; dyn.items=[]; dyn.workers=[]; dyn.bag=null;
@@ -1255,6 +1323,15 @@ function render3D(dt){
     else { const r=u.r*S.smokeR; s.position.set(X(1030+Math.cos(u.a)*r), 1+u.h*3+Math.sin(t+u.a)*.3, Z(300+Math.abs(Math.sin(u.a))*r)); const sz=3+S.smokeR*K*.25; s.scale.set(sz,sz,1); } } });
   G.dyn.workers.forEach((g,i)=>{ const w=S.workers[i]; if(!w) return; g.position.set(X(w.x),0,Z(w.y)); if(w.face!==undefined) g.rotation.y=w.face; animHuman(g,w.step,dist(w.x,w.y,MUSTER.x,MUSTER.y)>30,t); });
   if(G.dyn.bag) G.dyn.bag.visible = al && !S.bagDone;
+  // guide visuals
+  const gd=S.guide, gOn=guideOn && gd && gd.path && gd.target && !S.over;
+  if(gOn){ const pth=gd.path; let n=0, acc=0, nextAt=40; const m4=new THREE.Matrix4(), q=new THREE.Quaternion(), sc=new THREE.Vector3(), ps=new THREE.Vector3(), up=new THREE.Vector3(0,1,0);
+    for(let i=1;i<pth.length && n<60;i++){ const [x0,y0]=pth[i-1],[x1,y1]=pth[i]; const L=dist(x0,y0,x1,y1); while(acc+L>=nextAt && n<60){ const f=(nextAt-acc)/L; const x=x0+(x1-x0)*f, y=y0+(y1-y0)*f; const a=Math.atan2(-(x1-x0),-(y1-y0));
+        const pulse=.75+.35*Math.max(0,Math.sin(t*6-n*.5)); q.setFromAxisAngle(up,a); ps.set(X(x),.04,Z(y)); sc.set(pulse,1,pulse); m4.compose(ps,q,sc); G.arrows.setMatrixAt(n++,m4); nextAt+=36; } acc+=L; }
+    G.arrows.count=n; G.arrows.instanceMatrix.needsUpdate=true; G.beam.visible=true; G.beam.position.set(X(gd.target.x),7,Z(gd.target.y)); G.beam.material.opacity=.7+.3*Math.sin(t*3);
+  } else { G.arrows.count=0; G.beam.visible=false; }
+  G.escort.visible=!!(guideOn && gd && gd.esc && started);
+  if(G.escort.visible){ const e=gd.esc; G.escort.position.set(X(e.x),0,Z(e.y)); G.escort.rotation.y=e.face; animHuman(G.escort,e.step,e.moving,t); }
   G.renderer.render(scene,camera);
 }
 function renderIntro(t){
@@ -1275,6 +1352,8 @@ function drawHUD(){
   BUILD.forEach(b=>{c.fillStyle=b.c; c.fillRect(b.x*sx,b.y*sy,b.w*sx,b.h*sy);});
   c.fillStyle='#27ae60'; c.beginPath(); c.arc(MUSTER.x*sx,MUSTER.y*sy,4,0,7); c.fill();
   ZONES.forEach(z=>{ if(!z.r||(z.id in S.results)) return; c.fillStyle='#e0b800'; c.fillRect(z.x*sx-2,z.y*sy-2,4,4); });
+  if(S.guide&&S.guide.path&&guideOn){ c.strokeStyle='#0f7a4f'; c.lineWidth=2; c.setLineDash([3,2]); c.beginPath(); S.guide.path.forEach(([x,y],i)=>i?c.lineTo(x*sx,y*sy):c.moveTo(x*sx,y*sy)); c.stroke(); c.setLineDash([]); const T=S.guide.target; if(T){ c.fillStyle='#0f7a4f'; c.beginPath(); c.arc(T.x*sx,T.y*sy,4,0,7); c.fill(); } }
+  const gp=$('guidePanel'), T=S.guide&&S.guide.target; if(guideOn&&T&&S.guide.path&&started&&!S.over){ gp.classList.remove('hidden'); const pth=S.guide.path, nx=pth[Math.min(3,pth.length-1)]; const dx=nx[0]-S.p.x, dy=nx[1]-S.p.y, fx=-Math.sin(yaw), fy=-Math.cos(yaw); const ang=Math.atan2(fx*dy-fy*dx, fx*dx+fy*dy); $('gArrow').style.transform=`rotate(${ang}rad)`; $('gText').textContent=`Next: ${T.name} · ${Math.max(1,Math.round(pathLen(pth)*K))} m`; } else gp.classList.add('hidden');
   const px=S.p.x*sx, py=S.p.y*sy; c.fillStyle='#e00'; c.beginPath(); c.moveTo(px-Math.sin(yaw)*7,py-Math.cos(yaw)*7); c.lineTo(px+Math.cos(yaw)*3.5,py-Math.sin(yaw)*3.5); c.lineTo(px-Math.cos(yaw)*3.5,py+Math.sin(yaw)*3.5); c.fill();
 }
 
@@ -1319,11 +1398,12 @@ function toggleCam(){ firstPerson=!firstPerson; toast(firstPerson?'👁️ First
 $('act').onclick=doAct;
 $('phoneBtn').onclick=()=>{ if(!paused) openPhone(); };
 $('camBtn').onclick=()=>{ if(!paused) toggleCam(); };
+$('guideBtn').onclick=()=>{ guideOn=!guideOn; guidePick=null; $('guideBtn').textContent='🧭 Guide: '+(guideOn?'ON':'OFF'); toast(guideOn?'🧭 Your HSE escort will lead you to the next task.':'Guide off. Explore on your own. Use 📱 Tasks if you get lost.'); };
 $('autoBtn').onclick=()=>{ autoQ=!autoQ; $('autoBtn').textContent='⚡ Auto: '+(autoQ?'ON':'OFF'); toast(autoQ?'⚡ Questions now pop up automatically when you reach a place.':'Auto off. Press the green button to talk.'); };
 $('muteBtn').onclick=()=>{ muted=!muted; $('muteBtn').textContent=muted?'🔇':'🔊'; };
 
 // ================== START ==================
-function setHud(on){ ['hud','act','phoneBtn','camBtn','autoBtn','muteBtn','hint'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){$('prompt').classList.add('hidden');$('timer').classList.add('hidden');$('alarmv').classList.add('hidden');} }
+function setHud(on){ ['hud','act','phoneBtn','camBtn','autoBtn','guideBtn','muteBtn','hint'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){$('guidePanel').classList.add('hidden');$('prompt').classList.add('hidden');$('timer').classList.add('hidden');$('alarmv').classList.add('hidden');} }
 function showStart(){
   setHud(false); started=false; profile.role=null; newGame(); paused=true;
   const m=openModal(`<h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
@@ -1349,7 +1429,7 @@ function showStart(){
   m.querySelector('#start').onclick=()=>{
     profile.name=(m.querySelector('#nm').value.trim()||'Guest').slice(0,16);
     G.resetDynamic(); started=true; closeModal(); setHud(true);
-    toast('🛵 The okada has dropped you at the Main Gate. Walk up to Security.');
+    toast('🛵 The okada has dropped you at the Main Gate. Your HSE Escort will show you round. Follow the arrows.');
     setTimeout(()=>toast('📱 Tap "Tasks" to see what to do. Follow the yellow ! markers.'),2600);
   };
 }
