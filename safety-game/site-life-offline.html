@@ -776,12 +776,16 @@ function shareBlock(rec,pass){
 
 // ================== HSE RESULTS (shared store) ==================
 const cap = (name)=> (window.claude && window.claude.use) ? window.claude.use(name).catch(()=>null) : Promise.resolve(null);
+async function postServer(rec){ // results server (when hosted on our own server)
+  if(!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent/.test(location.hostname)) return false;
+  try{ const r=await fetch('api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:'factory',...rec})}); return r.ok; }catch(e){ return false; }
+}
 async function sendResult(rec){
   const el=()=>document.getElementById('hseSend'); const show=(t)=>{ if(el()) el().textContent=t; };
   try{
     const [db,user]=await Promise.all([cap('db'),cap('user')]);
     const uid = user ? await user.id() : null;
-    if(!db || !uid){ show('ℹ️ Use the WhatsApp or email button below to send your result to HSE.'); return; }
+    if(!db || !uid){ show(await postServer(rec) ? '✅ Your result has been sent to HSE.' : 'ℹ️ Use the WhatsApp or email button below to send your result to HSE.'); return; }
     const ref=db.doc('results/'+uid); const snap=await ref.get(); const old=snap.exists?snap.data():{};
     const attempts=[...(old.attempts||[]), rec].slice(-20);
     await ref.set({name:rec.name, role:rec.role, last:rec, attempts, passedEver: !!(old.passedEver || rec.result==='PASS'), updatedAt:Date.now()});

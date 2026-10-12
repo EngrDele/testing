@@ -773,6 +773,7 @@ function endGame(win){
   const level = !win? '' : S.stars>=total-2 ? 'GOLD' : S.stars>=total-6 ? 'SILVER' : 'BRONZE';
   const txt=`${DATA.title.toUpperCase()} – SAFETY STAR\nName: ${kid.name}\nResult: ${win?level+' ⭐ '+S.stars+' stars':'Try again'}\nDangers found: ${S.hazFound}/${S.hazTotal}\nDate: ${new Date().toLocaleString()}`;
   win?chime():buzz();
+  if(/^https?:$/.test(location.protocol) && !/claude\.ai|claudeusercontent/.test(location.hostname)) fetch('api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:WORLD,name:kid.name,role:'Pupil',result:win?level:'TRY AGAIN',hazards:S.hazFound+'/'+S.hazTotal,mistakes:S.mistakes.length,where:[...new Set(S.mistakes.map(x=>x.where))],stars:S.stars,date:new Date().toLocaleString()})}).catch(()=>{});
   const m=openModal(`<h1 style="margin:.1em 0">${win?'🎉 You did it!':'😮 Oops! Let\'s try again'}</h1>
     ${win?`<div class="cert"><div class="big">🏅 ${level} SAFETY STAR</div><div class="muted">${esc(DATA.title)}</div><div class="nm">${esc(kid.name)}</div><div>⭐ ${S.stars} stars · 🔎 ${S.hazFound}/${S.hazTotal} dangers found · ❤️ ${S.hearts} hearts left</div><div class="muted">${new Date().toLocaleDateString()}</div></div>`
           :`<p class="qt">You ran out of hearts. Every mistake is a chance to learn!</p>`}
