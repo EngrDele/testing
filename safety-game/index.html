@@ -52,6 +52,11 @@ input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);
 @media (max-width:600px){#guidePanel{bottom:120px;font-size:13px} #prompt{bottom:166px}}
 .btnlink{display:inline-block;text-decoration:none;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:10px 14px;font-weight:600}
 .btnlink.wa{background:#25D366;border-color:#1da851;color:#06290f}
+.games{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.gcard{display:flex;flex-direction:column;gap:2px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--chip);color:var(--ink);text-decoration:none;font-size:13px;line-height:1.25}
+.gcard .gi{font-size:24px}
+.gcard small{color:var(--muted)}
+.gcard.on{border:2px solid var(--brand);background:color-mix(in srgb,var(--brand) 12%,var(--chip))}
 .ppe-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .ppe-grid button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;font-size:13px}
 .ppe-grid button .e{font-size:30px}
@@ -1483,7 +1488,7 @@ $('muteBtn').onclick=()=>{ muted=!muted; $('muteBtn').textContent=muted?'🔇':'
 function setHud(on){ ['hud','act','phoneBtn','camBtn','autoBtn','guideBtn','muteBtn','hint'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){$('guidePanel').classList.add('hidden');$('prompt').classList.add('hidden');$('timer').classList.add('hidden');$('alarmv').classList.add('hidden');} }
 function showStart(){
   setHud(false); started=false; profile.role=null; newGame(); paused=true;
-  const m=openModal(`<h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
+  const m=openModal(`<p class="muted" style="margin:0 0 6px;font-weight:700">Choose a game</p><div class="games"><span class="gcard on"><span class="gi">🏭</span><b>Factory Site Induction</b><small>Workers & visitors</small></span><a class="gcard" href="kids.html?world=home"><span class="gi">🏠🚌</span><b>Home → School Bus</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=school"><span class="gi">🏫</span><b>School Safety</b><small>Kids 6–12</small></a></div><h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
     <p class="muted">The safety induction you <b>play</b>, not a paper you tick. Walk the compound, make the right calls, spot the hazards, and survive your first shift.<br>Demo site: <i>Acme Manufacturing, Ikeja</i>.</p>
     <p><b>Your name</b></p><input id="nm" placeholder="e.g. Tunde Bakare" maxlength="40" value="${esc(profile.name)}">
     <p><b>Company</b> <span class="muted">(optional)</span></p><input id="co" placeholder="e.g. ABC Contractors Ltd" maxlength="60" value="${esc(profile.company)}">
