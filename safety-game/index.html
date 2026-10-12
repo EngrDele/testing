@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Site Life Demo</title>
+<style>
+:root{
+  --bg:#f5f3ee; --panel:#ffffff; --ink:#1d1f22; --muted:#5d636b; --line:#ddd8cc;
+  --brand:#0f7a4f; --brand-ink:#ffffff; --warn:#b26b00; --bad:#c0392b; --good:#1e8e3e;
+  --tile:#fbfaf6; --tile-done:#e3f3e8; --tile-bad:#fbe5e2; --here:#ffd34d;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171a; --panel:#1f2226; --ink:#eceae5; --muted:#a2a8b0; --line:#343940;
+    --brand:#2fb57c; --brand-ink:#0b1a12; --warn:#f0a63a; --bad:#ff6b5e; --good:#4cc76d;
+    --tile:#24282d; --tile-done:#1d3a2a; --tile-bad:#432421; --here:#a8841c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171a; --panel:#1f2226; --ink:#eceae5; --muted:#a2a8b0; --line:#343940;
+  --brand:#2fb57c; --brand-ink:#0b1a12; --warn:#f0a63a; --bad:#ff6b5e; --good:#4cc76d;
+  --tile:#24282d; --tile-done:#1d3a2a; --tile-bad:#432421; --here:#a8841c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:.2em 0}
+h2{font-size:1.15rem;margin:.2em 0 .5em}
+.muted{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--tile);color:var(--ink);padding:10px 14px}
+button.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--tile);color:var(--ink);width:100%}
+.hud{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.bar{font-size:.85rem}
+.bar .track{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:3px}
+.bar .fill{height:100%;background:var(--good);transition:width .3s}
+.bar.low .fill{background:var(--bad)}
+.map{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tile{min-height:84px;text-align:left;display:flex;flex-direction:column;gap:2px;position:relative}
+.tile .ic{font-size:1.5rem}
+.tile .nm{font-size:.82rem;font-weight:600}
+.tile.done{background:var(--tile-done)}
+.tile.bad{background:var(--tile-bad)}
+.tile.here{outline:3px solid var(--here)}
+.tile .st{position:absolute;top:6px;right:8px;font-size:.9rem}
+.tile.wide{grid-column:span 3}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.opts button{text-align:left}
+.fb{margin-top:10px;padding:10px 12px;border-radius:10px;border-left:4px solid var(--good);background:var(--tile)}
+.fb.bad{border-color:var(--bad)}
+.items{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.items button{font-size:.9rem}
+.items button.found{border-color:var(--good);color:var(--good)}
+.items button.ok{opacity:.6}
+.event{border:2px solid var(--warn)}
+.alarm{border:3px solid var(--bad);animation:pulse 1s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--bad) 30%,transparent)}}
+@media (prefers-reduced-motion: reduce){.alarm{animation:none}}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--tile);border:1px solid var(--line);font-size:.85rem}
+.big{font-size:2rem;font-weight:700}
+ul.list{padding-left:1.2em;margin:.4em 0}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+td,th{border-bottom:1px solid var(--line);padding:6px;text-align:left}
+.hidden{display:none}
+@media (max-width:560px){
+  .map{grid-template-columns:repeat(2,1fr)}
+  .tile.wide{grid-column:span 2}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+// ---------- DATA ----------
+const ROLES = [
+  {id:'visitor', name:'Visitor', icon:'🧑‍💼', task:'Attend a meeting at Admin, then lunch at the Canteen.'},
+  {id:'electrician', name:'Contractor – Electrician', icon:'🧑‍🔧', task:'Replace a faulty breaker in the Electrical Room.'},
+  {id:'warehouse', name:'New Staff – Warehouse', icon:'👷', task:'Pick stock in the Warehouse and receive a truck at the Loading Bay.'},
+];
+
+const BARS = [
+  {k:'health', n:'❤️ Health'}, {k:'lungs', n:'🫁 Lungs'}, {k:'hearing', n:'👂 Hearing'},
+  {k:'eyes', n:'👁️ Eyes'}, {k:'site', n:'🛡️ Site Safety'},
+];
+
+// Each option: t=text, ok=true/false, fx={bar:delta}, why, fatal
+const ZONES = [
+  {id:'gate', name:'Main Gate', ic:'🚧', s:{
+    text:'An okada drops you at the gate. Your hands are full and you have no ID. The security man says: "Go in, I know you."',
+    o:[
+      {t:'Thank him and walk in', ok:false, fx:{site:-2}, why:'If you never sign in, nobody will know you are on site, so the muster count misses you in a fire.'},
+      {t:'Wait, sign the visitor register and collect a pass', ok:true, why:'Correct. Security controls who is inside so that everyone can be accounted for in an emergency.'},
+    ]}},
+  {id:'reception', name:'Reception & PPE', ic:'🦺', s:{
+    text:'Reception gives you safety boots, a hi-vis vest, goggles and ear plugs. The boots are a bit tight.',
+    o:[
+      {t:'Leave the boots, "na only small time I go spend"', ok:false, fx:{health:-2,site:-1}, why:'Accident no dey give notice. Ask for the right size; do not skip PPE.'},
+      {t:'Ask for the correct size and wear everything', ok:true, why:'Correct. PPE only works if you wear it, and it must fit.'},
+    ]}},
+  {id:'admin', name:'Admin Offices', ic:'🏢', s:{
+    text:'On the staircase, a cleaner has just mopped. There is no wet-floor sign and you are carrying files with both hands.',
+    o:[
+      {t:'Rush down, you are late', ok:false, fx:{health:-3}, why:'Slips, trips and falls are among the most common workplace injuries. Hold the rail.'},
+      {t:'Hold the handrail, go slowly and tell the cleaner to put up a sign', ok:true, why:'Correct. You protected yourself and the next person.'},
+    ]}},
+  {id:'canteen', name:'Canteen', ic:'🍲', s:{
+    text:'You smell gas near the kitchen burners. A cook is about to light the stove.',
+    o:[
+      {t:'Ignore it, cooks know their work', ok:false, fx:{health:-3,site:-3}, why:'A gas leak plus a flame can cause an explosion.'},
+      {t:'Shout "STOP, no fire!", don\'t touch switches, get people out and report it', ok:true, why:'Correct. No flames or switches, ventilate, evacuate and report.'},
+    ]}},
+  {id:'carpark', name:'Car Park', ic:'🚗', s:{
+    text:'A truck is reversing. There is no banksman, and you want to walk behind it to reach your car.',
+    o:[
+      {t:'Walk behind it quickly', ok:false, fx:{health:-5}, why:'The driver cannot see behind the truck. Reversing vehicles kill people every year.'},
+      {t:'Wait at the walkway until it stops, and stay where the driver can see you', ok:true, why:'Correct. Keep out of a reversing vehicle\'s path.'},
+    ]}},
+  {id:'forklift', name:'Forklift Route', ic:'🛻', s:{
+    text:'The canteen is just across the forklift lane. The yellow walkway goes the long way round.',
+    o:[
+      {t:'Cut across the lane', ok:false, fx:{health:-4,site:-1}, why:'The forklift driver cannot see you behind the load.'},
+      {t:'Use the yellow pedestrian walkway', ok:true, why:'Correct. People and forklifts must stay apart.'},
+    ]}},
+  {id:'warehouse', name:'Warehouse', ic:'📦', s:{
+    text:'Oga says: "Abeg climb that rack and bring the top box. No time for ladder."',
+    o:[
+      {t:'Climb the rack', ok:false, fatal:true, why:'You fell from height. Falls from height are among the top killers at work.'},
+      {t:'"I no fit do am like that." Use your Stop-Work right and get a ladder or order picker', ok:true, fx:{site:2}, badge:'Stop-Work Hero', why:'Correct. Everyone has the right to stop unsafe work, even when Oga is the one asking.'},
+    ]}},
+  {id:'workshop', name:'Workshop', ic:'🛠️', s:{
+    text:'Someone is grinding metal. Sparks are flying and the machine is very loud. You need to pass through.',
+    o:[
+      {t:'Pass quickly without goggles or ear plugs', ok:false, fx:{eyes:-4,hearing:-3}, why:'Grinding sparks and chips damage eyes, and loud noise damages hearing permanently.'},
+      {t:'Put on goggles and ear plugs, wait for a pause, then pass', ok:true, why:'Correct. Wear the right PPE for the area.'},
+    ]}},
+  {id:'generator', name:'Generator House', ic:'⛽', s:{
+    text:'NEPA has taken light. The gen is running, the door is shut because of the rain, and a colleague is sleeping inside.',
+    o:[
+      {t:'Leave him to rest', ok:false, fx:{lungs:-4,site:-2}, why:'Gen fumes contain carbon monoxide. You cannot smell it, and it kills people who are sleeping. Na quiet killer be gen smoke.'},
+      {t:'Open the door, wake him, bring him to fresh air and report', ok:true, why:'Correct. Ventilate, remove the person and report.'},
+    ]}},
+  {id:'electrical', name:'Electrical Room', ic:'⚡', s:null}, // role-specific below
+  {id:'chemical', name:'Chemical Store', ic:'🧪', s:{
+    text:'You find a drink bottle with clear liquid in it and no label on the chemical shelf.',
+    o:[
+      {t:'Smell it to find out what it is', ok:false, fx:{lungs:-3,eyes:-2}, why:'Never smell or taste an unknown chemical.'},
+      {t:'Don\'t touch it. Report it so it can be labelled or disposed of safely', ok:true, why:'Correct. Every chemical needs a label and a safety data sheet (SDS).'},
+    ]}},
+  {id:'diesel', name:'Diesel Tank Farm', ic:'🛢️', s:{
+    text:'A contractor near the diesel tanks lights a cigarette and says: "Diesel no dey catch fire like petrol."',
+    o:[
+      {t:'Join him, he has a point', ok:false, fx:{site:-4,health:-2}, why:'Diesel vapour, spills and nearby fuels can ignite. No smoking near fuel.'},
+      {t:'Ask him to put it out, show him the No Smoking sign and report it', ok:true, why:'Correct. Speaking up protects everyone on site.'},
+    ]}},
+  {id:'loading', name:'Loading Bay', ic:'🚚', wide:true, s:{
+    text:'A truck is at the bay. The loader is inside the trailer, the driver is in the cab with the engine on, and there are no wheel chocks.',
+    o:[
+      {t:'Start loading, the driver knows we\'re working', ok:false, fx:{health:-5}, why:'If the driver pulls away while someone is inside, that person falls or gets crushed.'},
+      {t:'Engine off, keys to the bay supervisor, chock the wheels, then load', ok:true, why:'Correct. Secure the vehicle before anyone works on it.'},
+    ]}},
+  {id:'muster', name:'Muster Point', ic:'🟢', s:{
+    text:'This is the Muster Point, where everyone gathers in an emergency. Where will you go if the fire alarm rings?',
+    o:[
+      {t:'To my car', ok:false, fx:{site:-1}, why:'The muster point is where you are counted. If you are missing, rescuers may go in looking for you.'},
+      {t:'Straight here, and I report to the fire warden', ok:true, why:'Correct. Remember this spot.'},
+    ]}},
+];
+
+const ELECTRICAL = {
+  electrician:{
+    text:'Your task: replace a faulty breaker. The panel is live and the production manager says: "Do it quick, no permit, we can\'t stop production."',
+    o:[
+      {t:'Work on it live, "e no go take time"', ok:false, fatal:true, why:'You were electrocuted. Never work on live equipment.'},
+      {t:'Get a permit, isolate the supply, lock and tag it (LOTO), test it is dead, then work', ok:true, fx:{site:2}, badge:'LOTO Pro', why:'Correct. Isolate, lock, tag, try. Production can wait; your life cannot.'},
+    ]},
+  default:{
+    text:'The door marked "DANGER – Authorised Persons Only" is open and the panel is humming. A friend says: "Come see inside."',
+    o:[
+      {t:'Go in and look', ok:false, fx:{health:-3,site:-1}, why:'High voltage can arc. Only authorised people may enter.'},
+      {t:'Stay out, close the door if it is safe to do so, and report it', ok:true, why:'Correct. Respect the signs.'},
+    ]},
+};
+
+// Things to look at in each zone; hazards are placed randomly each run
+const HAZARDS = [
+  {e:'🧯', t:'Extinguisher hidden behind cartons'},
+  {e:'🔌', t:'Frayed extension cable on the floor'},
+  {e:'🚪', t:'Fire exit blocked with pallets'},
+  {e:'⚙️', t:'Machine with its guard removed'},
+  {e:'🧴', t:'Unlabelled chemical bottle'},
+  {e:'🪜', t:'Ladder with a broken rung'},
+  {e:'💧', t:'Oil spill on the walkway'},
+  {e:'🔥', t:'Rags piled next to a hot pipe'},
+];
+const DECOYS = [
+  {e:'🪧', t:'Lit exit sign'}, {e:'🩹', t:'Stocked first-aid box'}, {e:'🗑️', t:'Waste bin with lid'},
+  {e:'🦺', t:'Hi-vis vest on a hook'}, {e:'📋', t:'Signed permit on the board'}, {e:'🚿', t:'Eye-wash station'},
+  {e:'🟨', t:'Painted walkway lines'}, {e:'📞', t:'Emergency phone'},
+];
+
+const EVENTS = [
+  {title:'⚡ NEPA has taken light!', text:'Power is gone. The generator kicks in and someone wants to "back-feed" the office by plugging the gen straight into a wall socket.',
+   o:[
+     {t:'Help him plug it in', ok:false, fx:{health:-3,site:-2}, why:'Back-feeding can electrocute people working on the lines and can cause a fire.'},
+     {t:'Stop him. Only the changeover switch should be used, by an electrician', ok:true, why:'Correct. Use the proper changeover.'},
+   ]},
+  {title:'🌧️ Heavy rain!', text:'The yard is flooding and water is moving towards the electrical room door.',
+   o:[
+     {t:'Wade through to reach the canteen', ok:false, fx:{health:-3}, why:'Water and electricity kill. You also cannot see open drains under flood water.'},
+     {t:'Keep away, warn others and call the emergency number on your phone', ok:true, why:'Correct. Warn, keep away, report.'},
+   ]},
+];
+
+// ---------- STATE ----------
+let S;
+const app = document.getElementById('app');
+const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function newGame(name, role){
+  const hz = shuffle(HAZARDS).slice(0,6);
+  const hzZones = shuffle(ZONES.filter(z=>z.id!=='muster').map(z=>z.id)).slice(0,6);
+  const scene = {};
+  ZONES.forEach(z=>{
+    const items = shuffle(DECOYS).slice(0,2).map(d=>({...d,hazard:false}));
+    const i = hzZones.indexOf(z.id);
+    if(i>=0) items.push({...hz[i],hazard:true});
+    scene[z.id] = shuffle(items).map(x=>({...x,tapped:false}));
+  });
+  S = {name, role, bars:{health:10,lungs:10,hearing:10,eyes:10,site:10},
+       here:'gate', results:{}, mistakes:[], badges:[], scene, hazTotal:6, hazFound:0,
+       moves:0, events:shuffle(EVENTS), eventAt:[3,7], pendingEvent:null, fatal:null, muster:null};
+  render();
+}
+
+function scenarioFor(z){
+  if(z.id==='electrical') return ELECTRICAL[S.role.id] || ELECTRICAL.default;
+  return z.s;
+}
+
+function applyChoice(opt, label){
+  for(const k in (opt.fx||{})) S.bars[k] = Math.max(0, Math.min(10, S.bars[k] + opt.fx[k]));
+  if(!opt.ok) S.mistakes.push({where:label, t:opt.t, why:opt.why});
+  if(opt.badge && !S.badges.includes(opt.badge)) S.badges.push(opt.badge);
+  if(opt.fatal) S.fatal = label + ': ' + opt.why;
+}
+
+// ---------- RENDER ----------
+function render(){
+  if(!S) return renderStart();
+  if(S.fatal) return renderReport();
+  if(S.muster) return renderMuster();
+  app.innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <div><h1>Site Life</h1><span class="pill">${S.role.icon} ${esc(S.role.name)}</span> <span class="pill">👤 ${esc(S.name)}</span></div>
+      <div class="row"><span class="pill">🔎 Hazards ${S.hazFound}/${S.hazTotal}</span><span class="pill">✅ ${Object.keys(S.results).length}/${ZONES.length} zones</span></div>
+    </div>
+    <div class="card"><div class="hud">${BARS.map(b=>{
+      const v=S.bars[b.k];return `<div class="bar ${v<=4?'low':''}">${b.n} <b>${v}</b>/10<div class="track"><div class="fill" style="width:${v*10}%"></div></div></div>`}).join('')}</div>
+      <p class="muted" style="margin:.6em 0 0">📱 Today's task: ${esc(S.role.task)} Visit every zone, make safe choices and spot the hazards.</p>
+    </div>
+    <div id="panel"></div>
+    <div class="card"><h2>Compound map</h2><div class="map">${ZONES.map(z=>{
+      const r=S.results[z.id];
+      return `<button class="tile ${z.wide?'wide':''} ${r===true?'done':r===false?'bad':''} ${S.here===z.id?'here':''}" data-go="${z.id}">
+        <span class="st">${r===true?'✅':r===false?'⚠️':''}</span><span class="ic">${z.ic}</span><span class="nm">${z.name}</span></button>`}).join('')}</div>
+      <div class="row" style="margin-top:12px"><button class="primary" id="endShift" ${Object.keys(S.results).length<ZONES.length?'disabled':''}>End shift</button>
+      <span class="muted">Visit all zones to finish your shift.</span></div>
+    </div>`;
+  app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>goTo(b.dataset.go));
+  document.getElementById('endShift').onclick=startMuster;
+  renderPanel();
+}
+
+function renderPanel(){
+  const p = document.getElementById('panel');
+  if(S.pendingEvent){
+    const ev = S.pendingEvent;
+    p.innerHTML = `<div class="card event"><h2>${ev.title}</h2><p>${esc(ev.text)}</p><div class="opts">${ev.o.map((o,i)=>`<button data-ev="${i}">${esc(o.t)}</button>`).join('')}</div><div id="fb"></div></div>`;
+    p.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>{
+      const o = ev.o[+b.dataset.ev]; applyChoice(o, ev.title);
+      p.querySelectorAll('[data-ev]').forEach(x=>x.disabled=true);
+      p.querySelector('#fb').innerHTML = fbHtml(o) + `<div style="margin-top:8px"><button class="primary" id="cont">Continue</button></div>`;
+      p.querySelector('#cont').onclick=()=>{S.pendingEvent=null; render();};
+    });
+    return;
+  }
+  const z = ZONES.find(z=>z.id===S.here), sc = scenarioFor(z), done = z.id in S.results;
+  p.innerHTML = `<div class="card"><h2>${z.ic} ${z.name}</h2><p>${esc(sc.text)}</p>
+    ${done?`<p class="muted">You have already handled this zone.</p>`:`<div class="opts">${shuffle(sc.o.map((o,i)=>({o,i}))).map(({o,i})=>`<button data-opt="${i}">${esc(o.t)}</button>`).join('')}</div>`}
+    <div id="fb"></div>
+    <h2 style="margin-top:14px">👀 Look around: tap anything unsafe</h2>
+    <div class="items">${S.scene[z.id].map((it,i)=>`<button data-it="${i}" class="${it.tapped?(it.hazard?'found':'ok'):''}" ${it.tapped?'disabled':''}>${it.e} ${esc(it.t)}${it.tapped&&it.hazard?' – reported ✔':''}</button>`).join('')}</div>
+    <div id="itfb" class="muted" style="margin-top:6px"></div></div>`;
+  p.querySelectorAll('[data-opt]').forEach(b=>b.onclick=()=>{
+    const o = sc.o[+b.dataset.opt]; applyChoice(o, z.name); S.results[z.id]=o.ok;
+    if(S.fatal) return render();
+    p.querySelectorAll('[data-opt]').forEach(x=>x.disabled=true);
+    p.querySelector('#fb').innerHTML = fbHtml(o);
+    setTimeout(render, 1600);
+  });
+  p.querySelectorAll('[data-it]').forEach(b=>b.onclick=()=>{
+    const it = S.scene[z.id][+b.dataset.it]; it.tapped=true;
+    if(it.hazard){S.hazFound++; S.bars.site=Math.min(10,S.bars.site+1);}
+    render();
+    document.getElementById('itfb').textContent = it.hazard ? '✔ Hazard reported. Site Safety +1.' : 'That one is fine. Keep looking.';
+  });
+}
+
+function fbHtml(o){
+  return `<div class="fb ${o.ok?'':'bad'}">${o.ok?'✅':'❌'} ${esc(o.why)}${o.badge?` <b>🏅 Badge: ${esc(o.badge)}</b>`:''}</div>`;
+}
+
+function goTo(id){
+  if(S.pendingEvent) return;
+  if(id!==S.here){
+    // leaving a zone with an unreported hazard costs site safety
+    const missed = S.scene[S.here].some(it=>it.hazard && !it.tapped);
+    if(missed && S.results[S.here]!==undefined && !S.scene[S.here].missPenalised){
+      S.scene[S.here].missPenalised = true; S.bars.site = Math.max(0,S.bars.site-1);
+    }
+    S.here=id; S.moves++;
+    if(S.eventAt.includes(S.moves) && S.events.length) S.pendingEvent = S.events.pop();
+  }
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ---------- EMERGENCY ----------
+function startMuster(){
+  S.muster = {left:15, choice:null};
+  S.musterTimer = setInterval(()=>{
+    S.muster.left--;
+    if(S.muster.left<=0){clearInterval(S.musterTimer); S.muster.choice='timeout'; renderReport();}
+    else { const el=document.getElementById('cd'); if(el) el.textContent=S.muster.left; }
+  },1000);
+  render();
+}
+function renderMuster(){
+  const opts = shuffle([
+    {k:'ok', t:'Stop work, leave by the nearest marked exit and walk to the Muster Point'},
+    {k:'lift', t:'Take the lift down, it is faster'},
+    {k:'bag', t:'Go back to Admin to pick up your bag and phone'},
+    {k:'hide', t:'Stay in the office, "na drill dem dey do"'},
+  ]);
+  app.innerHTML = `<div class="card alarm"><h1>🚨 FIRE ALARM!</h1>
+    <p>The alarm is ringing all over the compound and there is smoke near the Workshop. What do you do?</p>
+    <p class="big">⏱ <span id="cd">${S.muster.left}</span>s</p>
+    <div class="opts">${opts.map(o=>`<button data-m="${o.k}">${esc(o.t)}</button>`).join('')}</div></div>`;
+  app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{clearInterval(S.musterTimer); S.muster.choice=b.dataset.m; renderReport();});
+}
+
+// ---------- REPORT ----------
+function renderReport(){
+  clearInterval(S.musterTimer);
+  const why = {lift:'Never use the lift in a fire, because it can stop or open onto the fire floor.',
+               bag:'Never go back for belongings.', hide:'Treat every alarm as real.',
+               timeout:'You took too long. In a real fire, seconds matter.'};
+  if(S.muster && S.muster.choice!=='ok') S.mistakes.push({where:'Fire alarm', t:S.muster.choice, why:why[S.muster.choice]});
+  const barsOk = BARS.every(b=>S.bars[b.k]>=5);
+  const hazOk = S.hazFound/S.hazTotal >= 0.8;
+  const musterOk = S.muster && S.muster.choice==='ok';
+  const pass = !S.fatal && barsOk && hazOk && musterOk;
+  const record = {date:new Date().toLocaleString(), name:S.name, role:S.role.name, result:pass?'PASS':'REPLAY',
+                  hazards:`${S.hazFound}/${S.hazTotal}`, mistakes:S.mistakes.length};
+  saveRecord(record);
+  app.innerHTML = `<div class="card"><h1>${S.fatal?'🚑 Shift over':pass?'🎉 Induction passed':'🔁 Not yet. Replay'}</h1>
+    ${S.fatal?`<p class="fb bad">${esc(S.fatal)}</p><p>In real life, you would not be going home today. The good news: this was a game. Learn it here, not on site.</p>`:''}
+    <div class="row">
+      <span class="pill">${!S.fatal?'✅':'❌'} No life-critical error</span>
+      <span class="pill">${barsOk?'✅':'❌'} All body bars ≥ 5</span>
+      <span class="pill">${hazOk?'✅':'❌'} Hazards found ${S.hazFound}/${S.hazTotal} (need 80%)</span>
+      <span class="pill">${musterOk?'✅':'❌'} Reached the muster point</span>
+    </div>
+    ${S.badges.length?`<p>🏅 Badges: ${S.badges.map(esc).join(', ')}</p>`:''}
+    <h2 style="margin-top:14px">What to learn</h2>
+    ${S.mistakes.length?`<ul class="list">${S.mistakes.map(m=>`<li><b>${esc(m.where)}:</b> ${esc(m.why)}</li>`).join('')}</ul>`:'<p>No mistakes. Excellent.</p>'}
+    ${pass?`<div class="card" style="text-align:center"><div class="big">🪪 SITE PASS</div><div>${esc(S.name)} · ${esc(S.role.name)}</div><div class="muted">${record.date}</div><div class="muted">Show this to security at the gate</div></div>`:''}
+    <div class="row" style="margin-top:12px"><button class="primary" id="again">${pass?'Play another role':'Replay (scenarios reshuffled)'}</button>
+    <button id="log">HSE log</button></div><div id="logbox"></div></div>`;
+  document.getElementById('again').onclick=()=>{S=null; render();};
+  document.getElementById('log').onclick=showLog;
+}
+
+function saveRecord(r){
+  try{const a=JSON.parse(localStorage.getItem('sitelife-log')||'[]'); a.unshift(r); localStorage.setItem('sitelife-log',JSON.stringify(a.slice(0,50)));}catch(e){}
+}
+function showLog(){
+  let a=[]; try{a=JSON.parse(localStorage.getItem('sitelife-log')||'[]');}catch(e){}
+  document.getElementById('logbox').innerHTML = `<h2 style="margin-top:14px">HSE log (this device)</h2>
+    <p class="muted">In the real product this goes to the HSE dashboard.</p>
+    <div style="overflow-x:auto"><table><tr><th>Date</th><th>Name</th><th>Role</th><th>Result</th><th>Hazards</th><th>Mistakes</th></tr>
+    ${a.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.role)}</td><td>${esc(r.result)}</td><td>${esc(r.hazards)}</td><td>${esc(r.mistakes)}</td></tr>`).join('')}</table></div>`;
+}
+
+// ---------- START ----------
+function renderStart(){
+  app.innerHTML = `<h1>🦺 Site Life</h1>
+    <p class="muted">The safety induction you <b>play</b>, not a paper you tick. Demo compound: <i>Acme Manufacturing, Ikeja</i>.</p>
+    <div class="card"><h2>1. Your name</h2><input id="nm" placeholder="e.g. Tunde Bakare" maxlength="40"></div>
+    <div class="card"><h2>2. Role lottery</h2><p class="muted">Like Lagos Life's birth lottery, you don't choose. The role you get decides the hazards you meet.</p>
+      <p id="rolebox" class="big">🎲 ?</p><p id="roletask" class="muted"></p>
+      <div class="row"><button id="spin">Spin</button><button class="primary" id="start" disabled>Start my first shift</button></div></div>
+    <div class="card"><h2>How to pass</h2><ul class="list">
+      <li>Visit every zone on the compound map and make the safe choice.</li>
+      <li>Tap anything unsafe you see. Hazards move every game, so sharing answers won't help.</li>
+      <li>Keep all your body bars at 5 or above, and avoid any life-critical mistake.</li>
+      <li>When the fire alarm rings, act fast.</li></ul></div>`;
+  let role=null;
+  document.getElementById('spin').onclick=()=>{
+    let n=0; const t=setInterval(()=>{
+      role=ROLES[Math.floor(Math.random()*ROLES.length)];
+      document.getElementById('rolebox').textContent=`${role.icon} ${role.name}`;
+      if(++n>10){clearInterval(t); document.getElementById('roletask').textContent='📱 Task: '+role.task; document.getElementById('start').disabled=false;}
+    },90);
+  };
+  document.getElementById('start').onclick=()=>{
+    const name=document.getElementById('nm').value.trim()||'Guest';
+    newGame(name, role);
+  };
+}
+render();
+</script>
+</body>
+</html>
