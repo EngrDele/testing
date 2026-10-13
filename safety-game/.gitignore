@@ -3,3 +3,4 @@ server/data/
 tests/vendor/
 tests/out/
 dist/
+__pycache__/
