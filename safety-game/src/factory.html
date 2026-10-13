@@ -1,0 +1,1125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Site Life 3D</title>
+<style>
+:root{
+  --bg:#f5f3ee; --panel:#ffffff; --ink:#1d1f22; --muted:#5d636b; --line:#ddd8cc;
+  --brand:#0f7a4f; --brand-ink:#ffffff; --warn:#b26b00; --bad:#c0392b; --good:#1e8e3e; --chip:#f0ede5;
+  --hud:rgba(255,255,255,.86);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171a; --panel:#1f2226; --ink:#eceae5; --muted:#a2a8b0; --line:#343940;
+    --brand:#2fb57c; --brand-ink:#0b1a12; --warn:#f0a63a; --bad:#ff6b5e; --good:#4cc76d; --chip:#2a2e33;
+    --hud:rgba(25,27,30,.84);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171a; --panel:#1f2226; --ink:#eceae5; --muted:#a2a8b0; --line:#343940;
+  --brand:#2fb57c; --brand-ink:#0b1a12; --warn:#f0a63a; --bad:#ff6b5e; --good:#4cc76d; --chip:#2a2e33;
+  --hud:rgba(25,27,30,.84);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+canvas#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:#9cc3e6}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:10px 14px}
+button.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:700}
+button:disabled{opacity:.5;cursor:default}
+input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);width:100%}
+.hidden{display:none !important}
+.muted{color:var(--muted)}
+#hud{position:fixed;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;z-index:5}
+.hbox{background:var(--hud);border:1px solid var(--line);border-radius:12px;padding:8px 10px;backdrop-filter:blur(4px);pointer-events:auto}
+#bars{display:grid;grid-template-columns:repeat(5,auto);gap:4px 10px;font-size:12px;align-items:center}
+.b{min-width:58px}.b .t{height:5px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:2px}.b .f{height:100%;background:var(--good)}
+.b.low .f{background:var(--bad)}
+#info{font-size:12px;margin-top:6px;display:flex;gap:10px;flex-wrap:wrap}
+#mini{display:block;border-radius:8px}
+#toast{position:fixed;left:50%;top:92px;transform:translateX(-50%);z-index:6;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:min(92vw,460px)}
+.tst{background:var(--hud);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:10px;padding:8px 12px;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.tst.bad{border-left-color:var(--bad)}.tst.warn{border-left-color:var(--warn)}
+#act{position:fixed;right:18px;bottom:22px;z-index:5;width:78px;height:78px;border-radius:50%;font-weight:800;font-size:13px;background:var(--brand);color:var(--brand-ink);border:none;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.fbtn{position:fixed;z-index:5;border-radius:14px;padding:10px 12px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+#phoneBtn{right:106px;bottom:30px}
+#camBtn{right:106px;bottom:86px}
+#autoBtn{right:106px;bottom:142px;font-size:13px}
+#guideBtn{right:106px;bottom:198px;font-size:13px}
+#guidePanel{position:fixed;left:50%;bottom:164px;transform:translateX(-50%);z-index:5;background:var(--hud);border:1px solid var(--line);border-radius:14px;padding:6px 14px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+#gArrow{display:inline-block;font-size:22px;color:var(--brand);transition:transform .1s linear}
+@media (max-width:600px){#guidePanel{bottom:120px;font-size:13px} #prompt{bottom:166px}}
+.btnlink{display:inline-block;text-decoration:none;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:10px 14px;font-weight:600}
+.btnlink.wa{background:#25D366;border-color:#1da851;color:#06290f}
+.games{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.gcard{display:flex;flex-direction:column;gap:2px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--chip);color:var(--ink);text-decoration:none;font-size:13px;line-height:1.25}
+.gcard .gi{font-size:24px}
+.gcard small{color:var(--muted)}
+.gcard.on{border:2px solid var(--brand);background:color-mix(in srgb,var(--brand) 12%,var(--chip))}
+.ppe-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.ppe-grid button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;font-size:13px}
+.ppe-grid button .e{font-size:30px}
+.ppe-grid button.on{border:2px solid var(--brand);background:color-mix(in srgb,var(--brand) 14%,var(--chip))}
+#muteBtn{left:12px;bottom:22px;opacity:.9}
+#prompt{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:5;background:var(--hud);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-weight:600;pointer-events:none;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+#joy{position:fixed;z-index:4;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.6);background:rgba(255,255,255,.15);pointer-events:none;transform:translate(-50%,-50%)}
+#joy i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px;border-radius:50%;background:rgba(255,255,255,.75)}
+#hint{position:fixed;left:12px;bottom:76px;z-index:5;font-size:12px;background:var(--hud);border:1px solid var(--line);border-radius:10px;padding:6px 10px;max-width:220px}
+.ov{position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;width:min(520px,100%);max-height:92vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.modal h2{margin:.1em 0 .4em;font-size:1.2rem}
+.who{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+.who .av{font-size:2rem}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.opts button{text-align:left}
+.fb{margin-top:12px;padding:10px 12px;border-radius:10px;border-left:4px solid var(--good);background:var(--chip)}
+.fb.bad{border-left-color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--chip);border:1px solid var(--line);font-size:.85rem}
+.big{font-size:1.9rem;font-weight:800}
+.sw{width:34px;height:34px;border-radius:50%;padding:0;border:3px solid transparent}
+.sw.on{border-color:var(--ink)}
+ul.tasks{list-style:none;padding:0;margin:8px 0}
+ul.tasks li{padding:7px 0;border-bottom:1px solid var(--line);display:flex;gap:8px}
+table{width:100%;border-collapse:collapse;font-size:.82rem}td,th{border-bottom:1px solid var(--line);padding:5px;text-align:left}
+.alarmv{position:fixed;inset:0;z-index:3;pointer-events:none;box-shadow:inset 0 0 120px 40px rgba(220,30,30,.55);animation:pl .8s infinite}
+@keyframes pl{50%{box-shadow:inset 0 0 60px 10px rgba(220,30,30,.25)}}
+@media (prefers-reduced-motion: reduce){.alarmv{animation:none}}
+#timer{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:6;background:var(--bad);color:#fff;font-weight:800;border-radius:12px;padding:6px 14px;font-size:20px}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:20;background:var(--bg);font-weight:700}
+@media (max-width:600px){
+  #bars{grid-template-columns:repeat(3,auto)}
+  #mini{width:104px;height:82px}
+  #toast{top:150px}
+  #timer{top:104px}
+  .tst{font-size:13px;padding:6px 10px}
+  #hint{display:none}
+}
+</style>
+</head>
+<body>
+<div id="loading">Loading Site Life 3D…</div>
+<canvas id="game"></canvas>
+<div id="hud" class="hidden">
+  <div class="hbox"><div id="bars"></div><div id="info"></div></div>
+  <div class="hbox" style="padding:5px"><canvas id="mini" width="150" height="118"></canvas></div>
+</div>
+<div id="toast"></div>
+<div id="prompt" class="hidden"></div>
+<div id="joy" class="hidden"><i></i></div>
+<div id="hint" class="hidden">🎮 <b>WASD</b> move · <b>drag mouse</b> or <b>← →</b> look · <b>E</b> interact · <b>V</b> camera</div>
+<button id="act" class="hidden">E</button>
+<button id="phoneBtn" class="fbtn hidden">📱 Tasks</button>
+<button id="camBtn" class="fbtn hidden">👁️ View</button>
+<button id="autoBtn" class="fbtn hidden">⚡ Auto: ON</button>
+<button id="guideBtn" class="fbtn hidden">🧭 Guide: ON</button>
+<div id="guidePanel" class="hidden"><span id="gArrow">⬆</span><span id="gText"></span></div>
+<button id="muteBtn" class="fbtn hidden">🔊</button>
+<div id="timer" class="hidden"></div>
+<div id="alarmv" class="alarmv hidden"></div>
+<div id="ovl"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
+<script>
+// ================== DATA ==================
+const ROLES = [
+  {id:'visitor', name:'Visitor', icon:'🧑‍💼', task:'Attend a meeting at Admin and get to know the compound.'},
+  {id:'electrician', name:'Contractor – Electrician', icon:'🧑‍🔧', task:'Replace a faulty breaker in the Electrical Room.'},
+  {id:'warehouse', name:'New Staff – Warehouse', icon:'👷', task:'Pick stock in the Warehouse and receive a truck at the Loading Bay.'},
+];
+const SHIRTS = ['#3b6fb6','#a83232','#e9e6df','#2f6f4f','#6b4f8a'];
+const SKINS = ['#3b2416','#5a3825','#7b4a2e','#a0663f'];
+const BARS = [
+  {k:'health', n:'❤️', l:'Health'}, {k:'lungs', n:'🫁', l:'Lungs'}, {k:'hearing', n:'👂', l:'Hearing'},
+  {k:'eyes', n:'👁️', l:'Eyes'}, {k:'site', n:'🛡️', l:'Site'},
+];
+
+const SC = {
+  gate:{who:'👮 Security', text:'An okada drops you at the gate. Your hands are full and you have no ID. Security says: "Go in, I know you."',
+    o:[{t:'Thank him and walk in', ok:false, fx:{site:-2}, why:'If you never sign in, nobody will know you are on site, so the muster count misses you in a fire.'},
+       {t:'Wait, sign the visitor register and collect a pass', ok:true, why:'Correct. Security controls who is inside so that everyone can be accounted for in an emergency.'}]},
+  reception:{who:'💁🏾‍♀️ Receptionist', text:'"Welcome! Here are your safety boots, hi-vis vest, hard hat, goggles and ear plugs." The boots are a bit tight.',
+    o:[{t:'Leave the PPE, "na only small time I go spend"', ok:false, fx:{site:-1}, ppe:false, why:'Accident no dey give notice. Without ear plugs and goggles, noisy areas will now damage your hearing.'},
+       {t:'Ask for the correct size and wear everything', ok:true, ppe:true, why:'Correct. PPE only works if you wear it, and it must fit. Your character is now wearing PPE.'}]},
+  admin:{who:'🏢 Admin stairs', text:'On the staircase, a cleaner has just mopped. There is no wet-floor sign and you are carrying files with both hands.',
+    o:[{t:'Rush down, you are late', ok:false, fx:{health:-3}, why:'Slips, trips and falls are among the most common workplace injuries. Hold the rail.'},
+       {t:'Hold the handrail, go slowly and tell the cleaner to put up a sign', ok:true, why:'Correct. You protected yourself and the next person.'}]},
+  canteen:{who:'👨🏾‍🍳 Cook', text:'You smell gas near the kitchen burners. The cook is about to strike a match: "Make I light am, food don late."',
+    o:[{t:'Ignore it, cooks know their work', ok:false, fx:{health:-3,site:-3}, why:'A gas leak plus a flame can cause an explosion.'},
+       {t:'Shout "STOP, no fire!", don\'t touch switches, open the windows, get people out and report it', ok:true, why:'Correct. No flames or switches, ventilate, evacuate and report.'}]},
+  workshop:{who:'🛠️ Workshop', text:'Someone is grinding metal. Sparks are flying and the machine is very loud. You need to pass through to the store.',
+    o:[{t:'Pass quickly without goggles or ear plugs', ok:false, fx:{eyes:-4,hearing:-2}, why:'Grinding sparks and chips damage eyes, and loud noise damages hearing permanently.'},
+       {t:'Put on goggles and ear plugs, wait for a pause, then pass behind the screen', ok:true, why:'Correct. Wear the right PPE for the area.'}]},
+  chemical:{who:'🧪 Chemical store', text:'You find a drink bottle with clear liquid in it and no label on the chemical shelf.',
+    o:[{t:'Smell it to find out what it is', ok:false, fx:{lungs:-3,eyes:-2}, why:'Never smell or taste an unknown chemical.'},
+       {t:'Don\'t touch it. Report it so it can be labelled or disposed of safely', ok:true, why:'Correct. Every chemical needs a label and a safety data sheet (SDS).'}]},
+  diesel:{who:'🚬 Contractor', text:'A contractor near the diesel tanks lights a cigarette: "Diesel no dey catch fire like petrol."',
+    o:[{t:'Stand with him and gist', ok:false, fx:{site:-4}, why:'Diesel vapour, spills and nearby fuels can ignite. No smoking near fuel.'},
+       {t:'Ask him to put it out, show him the No Smoking sign and report it', ok:true, why:'Correct. Speaking up protects everyone on site.'}]},
+  warehouse:{who:'🧔🏾 Oga (Supervisor)', text:'"Abeg climb that rack and bring the top box. No time for ladder, the customer dey wait!"',
+    o:[{t:'Climb the rack', ok:false, fatal:true, why:'You fell from height. Falls from height are among the top killers at work.'},
+       {t:'"I no fit do am like that." Use your Stop-Work right and get a ladder or order picker', ok:true, fx:{site:2}, badge:'Stop-Work Hero', why:'Correct. Everyone has the right to stop unsafe work, even when Oga is the one asking.'}]},
+  generator:{who:'⛽ Generator house', text:'The gen is running, the door is shut and a colleague is sleeping inside on a carton.',
+    o:[{t:'Leave him to rest', ok:false, fx:{lungs:-4,site:-2}, why:'Gen fumes contain carbon monoxide. You cannot smell it, and it kills people who are sleeping. Na quiet killer be gen smoke.'},
+       {t:'Open the door, wake him, bring him to fresh air and report', ok:true, why:'Correct. Ventilate, remove the person and report.'}]},
+  loading:{who:'🚚 Loading bay', text:'A truck is at the bay. The loader is inside the trailer, the driver is in the cab with the engine running, and there are no wheel chocks.',
+    o:[{t:'Start loading, the driver knows we\'re working', ok:false, fx:{health:-4}, why:'If the driver pulls away while someone is inside, that person falls or gets crushed.'},
+       {t:'Engine off, keys to the bay supervisor, chock the wheels, then load', ok:true, why:'Correct. Secure the vehicle before anyone works on it.'}]},
+  carpark:{who:'🚐 Reversing van', text:'BEEP BEEP. A van is reversing towards you. There is no banksman, and your path goes right behind it.',
+    o:[{t:'Run behind it quickly', ok:false, fx:{health:-5}, why:'The driver cannot see behind the van. Reversing vehicles kill people every year.'},
+       {t:'Stop, step aside where the driver can see you, and wait until it has parked', ok:true, why:'Correct. Keep out of a reversing vehicle\'s path.'}]},
+  muster:{who:'🦺 Fire Warden', text:'"This is the Muster Point. If the fire alarm rings, where will you go?"',
+    o:[{t:'To my car, so I can leave quickly', ok:false, fx:{site:-1}, why:'The muster point is where you are counted. If you are missing, rescuers may go in looking for you.'},
+       {t:'Straight here, and I report to the fire warden', ok:true, why:'Correct. Remember this spot. You may need it soon.'}]},
+  electrical_electrician:{who:'👔 Production Manager', text:'"Change that breaker now. The panel is live, but no permit, we can\'t stop production!"',
+    o:[{t:'Work on it live, "e no go take time"', ok:false, fatal:true, why:'You were electrocuted. Never work on live equipment.'},
+       {t:'Get a permit, isolate the supply, lock and tag it (LOTO), test it is dead, then work', ok:true, fx:{site:2}, badge:'LOTO Pro', why:'Correct. Isolate, lock, tag, try. Production can wait; your life cannot.'}]},
+  electrical_default:{who:'⚡ Electrical room', text:'The door marked "DANGER – Authorised Persons Only" is open and the panel is humming. A friend says: "Come see inside."',
+    o:[{t:'Go in and look', ok:false, fx:{health:-3,site:-1}, why:'High voltage can arc. Only authorised people may enter.'},
+       {t:'Stay out, close the door if it is safe to do so, and report it', ok:true, why:'Correct. Respect the signs.'}]},
+};
+const EVENTS = {
+  nepa:{who:'⚡ NEPA has taken light!', text:'Power is gone and the compound goes dark. Someone wants to "back-feed" the office by plugging the small gen straight into a wall socket.',
+    o:[{t:'Help him plug it in', ok:false, fx:{health:-3,site:-2}, why:'Back-feeding can electrocute people working on the lines and can cause a fire.'},
+       {t:'Stop him. Only the changeover switch should be used, by an electrician', ok:true, why:'Correct. Use the proper changeover.'}]},
+  rain:{who:'🌧️ Heavy rain!', text:'The yard is flooding and water is moving towards the electrical room door.',
+    o:[{t:'Wade through to get to the canteen faster', ok:false, fx:{health:-3}, why:'Water and electricity kill. You also cannot see open drains under flood water.'},
+       {t:'Keep away, warn others and call the emergency number', ok:true, why:'Correct. Warn, keep away, report.'}]},
+};
+const HAZARDS = [
+  {e:'🧯', t:'Fire extinguisher hidden behind cartons'}, {e:'🔌', t:'Frayed extension cable across the path'},
+  {e:'🚪', t:'Fire exit blocked with pallets'}, {e:'⚙️', t:'Machine with its guard removed'},
+  {e:'🧴', t:'Unlabelled chemical bottle'}, {e:'🪜', t:'Ladder with a broken rung'},
+  {e:'🛢️', t:'Oil spill on the walkway'}, {e:'🔥', t:'Oily rags piled next to a hot pipe'},
+];
+const DECOYS = [
+  {e:'🩹', t:'Stocked first-aid box'}, {e:'🗑️', t:'Waste bin with lid'}, {e:'🚿', t:'Eye-wash station'},
+  {e:'📞', t:'Emergency phone'}, {e:'🪧', t:'Lit exit sign'}, {e:'🧤', t:'Gloves on a PPE rack'},
+];
+
+// ================== WORLD (map units; 1 unit = 5 cm) ==================
+const W = 1600, H = 1260, K = 0.05;
+const FENCE = {l:40, t:40, r:1560, b:1180, gateL:100, gateR:220};
+const LANE = {x1:260, x2:1540, y1:400, y2:480};
+const CROSS = [{x1:640,x2:700},{x1:1180,x2:1240}];
+const NOISE = {x:1030, y:180, r:210};
+const BUILD = [
+  {id:'admin', name:'ADMIN', x:300,y:80,w:260,h:200, c:'#e6dcc6', ht:9, door:{x:430,y:296}},
+  {id:'canteen', name:'CANTEEN', x:620,y:80,w:220,h:200, c:'#e8c9a4', ht:5, door:{x:730,y:296}},
+  {id:'workshop', name:'WORKSHOP', x:900,y:80,w:260,h:200, c:'#b9bdc1', ht:7, door:{x:1030,y:296}},
+  {id:'chemical', name:'CHEM STORE', x:1220,y:80,w:150,h:160, c:'#d9d3c7', ht:4, door:{x:1295,y:256}},
+  {id:'reception', name:'RECEPTION', x:300,y:560,w:220,h:160, c:'#d5e2d6', ht:5, door:{x:284,y:640}},
+  {id:'warehouse', name:'WAREHOUSE', x:580,y:540,w:380,h:240, c:'#c8ccd1', ht:9, door:{x:770,y:524}},
+  {id:'electrical', name:'ELECTRICAL', x:1010,y:560,w:150,h:140, c:'#eee0b0', ht:4, door:{x:1085,y:544}},
+  {id:'generator', name:'GEN HOUSE', x:1220,y:560,w:180,h:140, c:'#bcb7ad', ht:4.5, door:{x:1310,y:544}},
+  {id:'booth', name:'SECURITY', x:250,y:1080,w:80,h:70, c:'#ecebe6', ht:3},
+];
+const TANKS = [{x:1440,y:130,r:42},{x:1500,y:240,r:42}];
+const TRUCK = {x:640,y:840,w:240,h:86};
+const PARKED = [{x:1060,y:1090,w:60,h:36,c:'#c33'},{x:1160,y:1090,w:60,h:36,c:'#eee'},{x:1260,y:1090,w:60,h:36,c:'#335'}];
+const MUSTER = {x:1470,y:1000,r:56};
+const SPOTS = [[590,180],[870,200],[1190,180],[320,330],[545,760],[985,630],[1195,730],[1420,620],[565,890],[995,880],[275,990],[1430,1130]];
+const ZONES = [
+  {id:'gate', name:'Security at the Main Gate', x:160,y:1186, r:70, hint:'Talk to Security at the gate'},
+  {id:'reception', name:'Reception & PPE', x:284,y:640, r:60, hint:'Collect your PPE at Reception'},
+  {id:'admin', name:'Admin Offices', x:430,y:296, r:60, hint:'Go to the Admin meeting'},
+  {id:'canteen', name:'Canteen', x:730,y:296, r:60, hint:'Check the Canteen'},
+  {id:'workshop', name:'Workshop', x:1030,y:296, r:60, hint:'Pass through the Workshop'},
+  {id:'chemical', name:'Chemical Store', x:1295,y:256, r:60, hint:'Inspect the Chemical Store'},
+  {id:'diesel', name:'Contractor at the Diesel Tanks', x:1385,y:345, r:60, hint:'Visit the Diesel Tank Farm'},
+  {id:'forklift', name:'Forklift Lane', x:670,y:440, r:0, hint:'Cross the forklift lane safely'},
+  {id:'warehouse', name:'Oga at the Warehouse', x:770,y:524, r:60, hint:'See Oga at the Warehouse'},
+  {id:'electrical', name:'Electrical Room', x:1085,y:544, r:60, hint:'Go to the Electrical Room'},
+  {id:'generator', name:'Generator House', x:1310,y:544, r:60, hint:'Check the Generator House'},
+  {id:'loading', name:'Loading Bay', x:920,y:900, r:70, hint:'Help at the Loading Bay'},
+  {id:'carpark', name:'Car Park', x:0,y:0, r:0, hint:'Walk through the Car Park'},
+  {id:'muster', name:'Muster Point', x:MUSTER.x,y:MUSTER.y, r:0, hint:'Find the Muster Point'},
+];
+const NPCS = [
+  {x:250,y:1150, label:'Security', look:{sex:'m',skin:'#3b2416',top:'#2b3f66',bottom:'#1f2a40',hat:'cap',hatColor:'#1b2538',longSleeve:true,collar:true,beard:true,boots:true,label:'Security'}},
+  {x:250,y:640, label:'Receptionist', look:{sex:'f',skin:'#6b4226',dress:true,outfit:'dress',topMap:null,gele:null,hair:'none',shoe:'#5a1d1d',label:'Receptionist'}},
+  {x:770,y:310, label:'Cook', look:{sex:'m',skin:'#4a2e1e',top:'#f6f6f2',bottom:'#2b2b2b',hat:'chef',longSleeve:true,outfit:'chef',label:'Cook'}},
+  {x:1375,y:365, label:'Contractor', smoke:true, look:{sex:'m',skin:'#5a3825',top:'#d9661f',bottom:'#d9661f',outfit:'coverall',hat:'hard',hatColor:'#f5f5f5',longSleeve:true,beard:true,boots:true,gloves:true,label:'Contractor'}},
+  {x:815,y:512, label:'Oga', look:{sex:'m',skin:'#3d2416',top:'#9fc3e6',bottom:'#2a2f3a',build:'heavy',vest:true,hat:'hard',hatColor:'#ffffff',longSleeve:true,collar:true,beard:true,boots:true,label:'Oga (Supervisor)'}},
+  {x:1500,y:1040, label:'Fire Warden', look:{sex:'f',skin:'#5a3825',top:'#2b2b36',bottom:'#2b2b36',hair:'braids',vest:true,vestColor:'#ff4d1a',hat:'hard',hatColor:'#d0201a',longSleeve:true,boots:true,label:'Fire Warden'}},
+];
+
+// ================== STATE ==================
+let S = null, profile = {name:'', company:'', role:null, shirt:SHIRTS[0], skin:SKINS[1], sex:'m'};
+// Optional HSE contact baked into the link: ?hse=2348012345678&email=hse@company.com
+const QS=new URLSearchParams(location.search); const HSE_WA=(QS.get('hse')||'').replace(/[^0-9]/g,''); const HSE_MAIL=(QS.get('email')||'').trim();
+let autoQ = true;
+const keys = {}; let joy = null, look = null; let paused = true; let audio = null, muted = false;
+let yaw = 0, pitch = 0.25, firstPerson = false;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
+const dist = (a,b,c,d) => Math.hypot(a-c,b-d);
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+
+function newGame(){
+  const spots = shuffle(SPOTS);
+  const hz = shuffle(HAZARDS).slice(0,6), dc = shuffle(DECOYS).slice(0,4);
+  const items = [...hz.map(h=>({...h,hazard:true})), ...dc.map(d=>({...d,hazard:false}))]
+    .map((it,i)=>({...it, x:spots[i][0], y:spots[i][1], done:null}));
+  S = {
+    p:{x:160,y:1242,face:0,step:0,ppe:{},moving:false}, ppeHit:{},
+    bars:{health:10,lungs:10,hearing:10,eyes:10,site:10},
+    results:{}, mistakes:[], badges:[], items, hazTotal:6, hazFound:0,
+    t:0, forklift:{x:400,dir:1,stop:false}, van:{y:1050,dir:-1,wait:0},
+    gateOpen:false, nepa:0, rain:0, firedEvents:{},
+    alarm:null, smokeR:0, workers:[], bagDone:false,
+    fatal:null, over:false, lastHit:-9, noiseToastAt:-9, smokeToastAt:-9,
+  };
+  yaw = 0; pitch = 0.25;
+  if(G) G.resetDynamic();
+}
+
+// ================== AUDIO ==================
+function ensureAudio(){ if(!audio){ try{ audio = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+function beep(f=880, d=0.12, type='square', v=0.05){
+  if(muted||!audio) return;
+  try{ const o=audio.createOscillator(), g=audio.createGain(); o.type=type; o.frequency.value=f; o.connect(g); g.connect(audio.destination);
+    const t=audio.currentTime; g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.0001,t+d); o.start(t); o.stop(t+d); }catch(e){}
+}
+const chime = ()=>{beep(660,.12,'sine',.08); setTimeout(()=>beep(990,.18,'sine',.08),110);};
+const buzz = ()=>beep(140,.35,'sawtooth',.07);
+
+// ================== UI ==================
+function toast(msg, kind=''){
+  const d=document.createElement('div'); d.className='tst '+kind; d.textContent=msg; $('toast').appendChild(d);
+  setTimeout(()=>d.remove(), 3400);
+  while($('toast').children.length>2) $('toast').firstChild.remove();
+}
+function openModal(html){ paused=true; joy=null; look=null; $('joy').classList.add('hidden'); for(const k in keys) keys[k]=false;
+  $('ovl').innerHTML=`<div class="ov"><div class="modal">${html}</div></div>`; return $('ovl').querySelector('.modal'); }
+function closeModal(){ $('ovl').innerHTML=''; paused=false; last=performance.now(); }
+
+function scenario(sc, label, onDone){
+  const opts = shuffle(sc.o.map((o,i)=>({o,i})));
+  const parts = sc.who.split(' ');
+  const m = openModal(`<div class="who"><span class="av">${esc(parts[0])}</span><h2>${esc(parts.slice(1).join(' '))}</h2></div>
+    <p>${esc(sc.text)}</p><div class="opts">${opts.map(({o,i})=>`<button data-i="${i}">${esc(o.t)}</button>`).join('')}</div><div id="fb"></div>`);
+  m.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{
+    const o = sc.o[+b.dataset.i];
+    m.querySelectorAll('[data-i]').forEach(x=>x.disabled=true);
+    applyChoice(o,label); o.ok?chime():buzz();
+    m.querySelector('#fb').innerHTML = `<div class="fb ${o.ok?'':'bad'}">${o.ok?'✅':'❌'} ${esc(o.why)}${o.badge?`<br><b>🏅 Badge earned: ${esc(o.badge)}</b>`:''}</div>
+      <div style="margin-top:10px"><button class="primary" id="cont">Continue</button></div>`;
+    m.querySelector('#cont').onclick=()=>{ closeModal(); onDone&&onDone(o); if(S.fatal) endGame(); };
+    m.querySelector('#cont').focus();
+  });
+}
+function applyChoice(o,label){
+  for(const k in (o.fx||{})) S.bars[k]=clamp(S.bars[k]+o.fx[k],0,10);
+  if(!o.ok) S.mistakes.push({where:label, why:o.why});
+  if(o.badge && !S.badges.includes(o.badge)) S.badges.push(o.badge);
+  if(o.ppe!==undefined) S.p.ppe=o.ppe;
+  if(o.fatal) S.fatal = label+': '+o.why;
+}
+function complete(id, ok){
+  if(id in S.results) return;
+  S.results[id]=ok;
+  const n = Object.keys(S.results).length;
+  if(n===4 && !S.firedEvents.nepa){ S.firedEvents.nepa=1; setTimeout(()=>fireEvent('nepa'),1500); }
+  if(n===8 && !S.firedEvents.rain){ S.firedEvents.rain=1; setTimeout(()=>fireEvent('rain'),1500); }
+  if(n===ZONES.length && !S.alarm){ toast('📱 Shift almost done. Head back towards Admin to sign out…'); setTimeout(startAlarm, 5000); }
+}
+function fireEvent(k){
+  if(!S||S.over||S.alarm) return;
+  if(paused){ setTimeout(()=>fireEvent(k),1000); return; }
+  if(k==='nepa'){ S.nepa=45; beep(200,.4,'sine',.06); }
+  if(k==='rain') S.rain=45;
+  scenario(EVENTS[k], EVENTS[k].who);
+}
+function zoneScenario(id){
+  if(id==='electrical') return SC[profile.role.id==='electrician'?'electrical_electrician':'electrical_default'];
+  return SC[id];
+}
+
+// ================== INTERACTIONS ==================
+function interactables(){
+  const list=[];
+  for(const z of ZONES){
+    if(!z.r || (z.id in S.results)) continue;
+    list.push({x:z.x,y:z.y,r:z.r,label:'TALK', name:z.name, auto:true, run:()=>{
+      if(z.id==='reception'){ ppeSelect(ok=>complete('reception',ok)); return; }
+      scenario(zoneScenario(z.id), z.name, o=>{ complete(z.id,o.ok); if(z.id==='gate'){ S.gateOpen=true; toast('🚧 The barrier is up. Head to Reception for your PPE.'); } });
+    }});
+  }
+  for(const it of S.items){ if(!it.done) list.push({x:it.x,y:it.y,r:48,label:'LOOK',name:'Inspect: '+it.t,run:()=>inspect(it)}); }
+  if(S.alarm && !S.bagDone){
+    list.push({x:430,y:300,r:55,label:'BAG',name:'Your bag and phone',auto:true,run:()=>{
+      const m=openModal(`<h2>👜 Your bag</h2><p>Your bag and charger are still inside Admin. The alarm is ringing.</p>
+        <div class="opts"><button id="b1">Run in and grab it quickly</button><button id="b2">Leave it. Go to the muster point</button></div>`);
+      m.querySelector('#b1').onclick=()=>{S.bagDone=true; S.mistakes.push({where:'Fire alarm',why:'Never go back for belongings during an evacuation.'}); S.bars.lungs=clamp(S.bars.lungs-2,0,10); S.alarm.left-=8; buzz(); closeModal(); toast('❌ You lost 8 seconds and breathed smoke.','bad');};
+      m.querySelector('#b2').onclick=()=>{S.bagDone=true; chime(); closeModal(); toast('✅ Right. Things can be replaced; you cannot.');};
+    }});
+  }
+  return list;
+}
+function inspect(it){
+  const m = openModal(`<div class="who"><span class="av">${it.e}</span><h2>Inspect</h2></div><p>You see: <b>${esc(it.t)}</b></p>
+    <div class="opts"><button id="r1">⚠️ Report as a hazard</button><button id="r2">👍 Looks fine, move on</button></div><div id="fb"></div>`);
+  const fin = (report)=>{
+    m.querySelectorAll('.opts button').forEach(b=>b.disabled=true);
+    let msg, ok=true;
+    if(it.hazard && report){ S.hazFound++; S.bars.site=clamp(S.bars.site+1,0,10); msg='Hazard reported. HSE will fix it. Site Safety +1.'; }
+    else if(it.hazard){ ok=false; S.bars.site=clamp(S.bars.site-1,0,10); S.mistakes.push({where:'Hazard missed', why:`"${it.t}" is a hazard. Report anything that could hurt someone.`}); msg='That was a hazard! Walking past it leaves it there to hurt someone.'; }
+    else if(report){ msg='That one is actually fine, but reporting when unsure is never wrong.'; }
+    else msg='Correct. That one is fine.';
+    it.done = (it.hazard&&report)?'tag':'seen';
+    ok?chime():buzz();
+    m.querySelector('#fb').innerHTML=`<div class="fb ${ok?'':'bad'}">${ok?'✅':'❌'} ${esc(msg)}</div><div style="margin-top:10px"><button class="primary" id="cont">Continue</button></div>`;
+    m.querySelector('#cont').onclick=closeModal;
+  };
+  m.querySelector('#r1').onclick=()=>fin(true); m.querySelector('#r2').onclick=()=>fin(false);
+}
+function startAlarm(){
+  if(!S||S.over) return;
+  if(paused){ setTimeout(startAlarm,1000); return; }
+  S.alarm={left:45, done:false}; S.smokeR=40; S.nepa=0; S.rain=0;
+  $('alarmv').classList.remove('hidden'); $('timer').classList.remove('hidden');
+  S.workers = [[430,310],[730,310],[1030,310],[770,520],[1310,530],[270,640],[930,900]].map(([x,y])=>({x,y,step:0}));
+  G.spawnWorkers();
+  const m=openModal(`<h1 style="margin:0">🚨 FIRE ALARM!</h1><p>Smoke is pouring from the <b>Workshop</b>. Stop what you are doing and get to the <b>Muster Point</b> (the green circle by the car park) within 45 seconds. Avoid the smoke.</p><button class="primary" id="go">GO!</button>`);
+  m.querySelector('#go').onclick=closeModal;
+}
+function endGame(){
+  if(S.over) return; S.over=true; paused=true;
+  $('alarmv').classList.add('hidden'); $('timer').classList.add('hidden');
+  const musterOk = S.alarm && S.alarm.done;
+  const barsOk = BARS.every(b=>S.bars[b.k]>=5);
+  const hazOk = S.hazFound/S.hazTotal>=0.8;
+  const pass = !S.fatal && barsOk && hazOk && musterOk;
+  const rec = {date:new Date().toLocaleString(), name:profile.name, company:profile.company, role:profile.role.name, result:pass?'PASS':'REPLAY', hazards:`${S.hazFound}/${S.hazTotal}`, mistakes:S.mistakes.length, where:[...new Set(S.mistakes.map(x=>x.where))].slice(0,15), fatal:!!S.fatal, t:Date.now()};
+  try{const a=JSON.parse(localStorage.getItem('sitelife-log')||'[]'); a.unshift(rec); localStorage.setItem('sitelife-log',JSON.stringify(a.slice(0,50)));}catch(e){}
+  pass?chime():buzz();
+  const m=openModal(`<h1 style="margin:.1em 0">${S.fatal?'🚑 Shift over':pass?'🎉 Induction passed!':'🔁 Not yet. Replay'}</h1>
+    ${S.fatal?`<div class="fb bad">${esc(S.fatal)}</div><p>In real life, you would not be going home today. The good news: this was a game. Learn it here, not on site.</p>`:''}
+    <div class="row">
+      <span class="pill">${!S.fatal?'✅':'❌'} No life-critical error</span>
+      <span class="pill">${barsOk?'✅':'❌'} All body bars ≥ 5</span>
+      <span class="pill">${hazOk?'✅':'❌'} Hazards ${S.hazFound}/${S.hazTotal} (need 5)</span>
+      <span class="pill">${musterOk?'✅':'❌'} Reached the muster point</span>
+    </div>
+    ${S.badges.length?`<p>🏅 ${S.badges.map(esc).join(' · ')}</p>`:''}
+    <h2 style="margin-top:12px">What to learn</h2>
+    ${S.mistakes.length?`<ul>${S.mistakes.map(x=>`<li><b>${esc(x.where)}:</b> ${esc(x.why)}</li>`).join('')}</ul>`:'<p>No mistakes. Excellent!</p>'}
+    ${pass?`<div class="fb" style="text-align:center"><div class="big">🪪 SITE PASS</div><div>${esc(profile.name)}${profile.company?' · '+esc(profile.company):''} · ${esc(profile.role.name)}</div><div class="muted">${esc(rec.date)}</div><div class="muted">Show this to Security at the gate</div></div>`:''}
+    <p id="hseSend" class="muted">⏳ Sending your result to HSE…</p>
+    ${shareBlock(rec,pass)}<div class="row" id="endRow" style="margin-top:12px"><button class="primary" id="again">${pass?'Play again':'Replay (everything reshuffled)'}</button><button id="log">This device's log</button></div><div id="logbox"></div>`);
+  sendResult(rec); showDashButton(m.querySelector('#endRow'));
+  m.querySelector('#again').onclick=()=>{closeModal(); showStart();};
+  m.querySelector('#log').onclick=()=>{
+    let a=[]; try{a=JSON.parse(localStorage.getItem('sitelife-log')||'[]');}catch(e){}
+    m.querySelector('#logbox').innerHTML=`<h2 style="margin-top:12px">HSE log (this device)</h2><p class="muted">In the real product this goes to the HSE dashboard.</p><div style="overflow-x:auto"><table><tr><th>Date</th><th>Name</th><th>Role</th><th>Result</th><th>Hazards</th><th>Mistakes</th></tr>${a.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.role)}</td><td>${esc(r.result)}</td><td>${esc(r.hazards)}</td><td>${esc(r.mistakes)}</td></tr>`).join('')}</table></div>`;
+  };
+}
+function openPhone(){
+  const done = Object.keys(S.results).length;
+  const m=openModal(`<h2>📱 My Phone · Tasks</h2><p class="muted">${esc(profile.role.icon)} <b>${esc(profile.role.name)}</b>: ${esc(profile.role.task)}</p>
+    <p><span class="pill">✅ ${done}/${ZONES.length} areas</span> <span class="pill">🔎 ${S.hazFound}/${S.hazTotal} hazards reported</span></p>
+    <ul class="tasks">${ZONES.map(z=>{const r=S.results[z.id]; return `<li><span>${r===true?'✅':r===false?'⚠️':'⬜'}</span><span style="flex:1">${esc(z.hint)}</span>${r===undefined?`<button data-go="${z.id}" style="padding:4px 10px;font-size:12px">📍 Show me</button>`:''}</li>`}).join('')}
+    <li><span>🔎</span><span>Find and report hidden hazards around the compound. Look for objects on the ground and against walls.</span></li></ul>
+    <p class="muted">🚨 Emergency: 112 · Site HSE: ext. 222</p>
+    <p class="muted">Controls: WASD / arrow keys to walk, drag the mouse (or the right side of the screen) to look around, E / Space or the green button to interact, V or 👁️ to switch between first and third person. On a phone, drag the left side of the screen to walk.</p>
+    <button class="primary" id="cl">Close</button>`);
+  m.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ guidePick=b.dataset.go; guideOn=true; $('guideBtn').textContent='🧭 Guide: ON'; if(S.guide) S.guide.key=''; closeModal(); });
+  m.querySelector('#cl').onclick=closeModal;
+}
+
+
+// ================== PPE SELECTION ==================
+const PPE_ITEMS=[
+  {k:'hat',n:'Hard hat',e:'⛑️',why:'A hard hat protects your head from falling objects in the warehouse and workshop.'},
+  {k:'vest',n:'Hi-vis vest',e:'🦺',why:'A hi-vis vest lets forklift and truck drivers see you.'},
+  {k:'boots',n:'Safety boots',e:'🥾',why:'Steel-toe safety boots protect your feet from heavy loads and wheels.'},
+  {k:'goggles',n:'Safety goggles',e:'🥽',why:'Goggles protect your eyes from grinding sparks, dust and chemical splash.'},
+  {k:'muffs',n:'Ear defenders',e:'🎧',why:'Ear defenders protect your hearing in the workshop noise area (above 85 dB).'},
+  {k:'gloves',n:'Work gloves',e:'🧤',why:'Your job involves handling materials or electrical work, so you need gloves.'},
+  {k:'slippers',n:'Bathroom slippers',e:'🩴',bad:true,maps:'boots',why:'Slippers no be safety boot. Your toes are exposed.'},
+  {k:'shades',n:'Fashion sunglasses',e:'🕶️',bad:true,maps:'goggles',why:'Sunglasses are not impact-rated and can shatter into your eyes.'},
+  {k:'facecap',n:'Face cap',e:'🧢',bad:true,maps:'hat',why:'A face cap gives no protection from falling objects.'},
+];
+function needsGloves(){ return profile.role && (profile.role.id==='electrician'||profile.role.id==='warehouse'); }
+function requiredPPE(){ return ['hat','vest','boots','goggles','muffs'].concat(needsGloves()?['gloves']:[]); }
+function ppeSelect(onDone){
+  const sel=new Set();
+  const m=openModal(`<div class="who"><span class="av">💁🏾‍♀️</span><h2>Receptionist · PPE store</h2></div>
+    <p>"Welcome! You are a <b>${esc(profile.role.name)}</b>. Pick everything you need to wear on this site today."</p>
+    <div class="ppe-grid">${shuffle(PPE_ITEMS).map(i=>`<button data-k="${i.k}"><span class="e">${i.e}</span>${esc(i.n)}</button>`).join('')}</div>
+    <div class="row" style="margin-top:12px"><button class="primary" id="wear">Put on selected PPE</button></div><div id="fb"></div>`);
+  m.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ const k=b.dataset.k; sel.has(k)?sel.delete(k):sel.add(k); b.classList.toggle('on',sel.has(k)); });
+  m.querySelector('#wear').onclick=()=>{
+    m.querySelectorAll('[data-k],#wear').forEach(b=>b.disabled=true);
+    const req=requiredPPE(), missing=req.filter(k=>!sel.has(k)), wrong=PPE_ITEMS.filter(i=>i.bad&&sel.has(i.k));
+    const worn={}; PPE_ITEMS.forEach(i=>{ if(!i.bad && sel.has(i.k)) worn[i.k]=true; }); S.p.ppe=worn;
+    missing.forEach(k=>{ const it=PPE_ITEMS.find(i=>i.k===k); S.mistakes.push({where:'PPE: '+it.n,why:it.why}); S.bars.site=clamp(S.bars.site-1,0,10); });
+    wrong.forEach(it=>{ S.mistakes.push({where:'PPE: '+it.n,why:it.why}); });
+    const ok=!missing.length && !wrong.length; ok?chime():buzz();
+    m.querySelector('#fb').innerHTML=`<div class="fb ${ok?'':'bad'}">${ok?'✅ Perfect. You are fully kitted for your job.':'❌ Not quite right:'}
+      ${missing.map(k=>{const it=PPE_ITEMS.find(i=>i.k===k); return `<div>• Missing <b>${it.e} ${esc(it.n)}</b>: ${esc(it.why)}</div>`}).join('')}
+      ${wrong.map(it=>`<div>• <b>${it.e} ${esc(it.n)}</b>: ${esc(it.why)}</div>`).join('')}
+      ${ok?'':'<div style="margin-top:6px"><i>Careful: anything you are missing can hurt you later on site.</i></div>'}</div>
+      <div style="margin-top:10px"><button class="primary" id="cont">Continue</button></div>`;
+    m.querySelector('#cont').onclick=()=>{ closeModal(); onDone(ok); toast('🦺 You are now wearing: '+(PPE_ITEMS.filter(i=>!i.bad&&worn[i.k]).map(i=>i.n).join(', ')||'nothing!')); };
+  };
+}
+
+
+// ================== GUIDE / ESCORT ==================
+let guideOn = true, guidePick = null;
+const ROUTE = ['gate','reception','admin','canteen','workshop','chemical','diesel','forklift','electrical','generator','warehouse','loading','carpark','muster'];
+const TARGET_PT = {forklift:[670,500], carpark:[1290,960], muster:[MUSTER.x,MUSTER.y]};
+const ZNAME = {forklift:'Zebra crossing (forklift lane)', carpark:'Car Park', muster:'Muster Point'};
+function nextTask(){
+  if(S.alarm && !S.alarm.done) return {id:'muster', name:'MUSTER POINT', x:MUSTER.x, y:MUSTER.y};
+  const pick = guidePick && !(guidePick in S.results) ? guidePick : ROUTE.find(id=>!(id in S.results));
+  if(!pick) return null;
+  const z=ZONES.find(z=>z.id===pick), pt=TARGET_PT[pick]||[z.x,z.y];
+  return {id:pick, name:ZNAME[pick]||z.name, x:pt[0], y:pt[1]};
+}
+const GS=20, GW=Math.ceil(W/GS), GH=Math.ceil(H/GS); let GRID=null, GRID_GATE=null;
+function buildGrid(){ const sol=solids(); GRID=new Uint8Array(GW*GH); for(let y=0;y<GH;y++) for(let x=0;x<GW;x++) GRID[y*GW+x]=blocked(x*GS+GS/2,y*GS+GS/2,15,sol)?1:0; GRID_GATE=S.gateOpen; }
+function cellCost(x,y){ const cx=x*GS+GS/2, cy=y*GS+GS/2; if(cy>LANE.y1-8 && cy<LANE.y2+8 && cx>LANE.x1 && cx<LANE.x2) return CROSS.some(c=>cx>c.x1 && cx<c.x2)?1:40; return 1; }
+function freeCell(cx,cy){ if(!GRID[cy*GW+cx]) return [cx,cy]; for(let r=1;r<6;r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ const x=cx+dx,y=cy+dy; if(x>=0&&y>=0&&x<GW&&y<GH&&!GRID[y*GW+x]) return [x,y]; } return [cx,cy]; }
+function findPath(sx,sy,tx,ty){
+  if(!GRID||GRID_GATE!==S.gateOpen) buildGrid();
+  const [ax,ay]=freeCell(clamp(Math.floor(sx/GS),0,GW-1),clamp(Math.floor(sy/GS),0,GH-1)), [bx,by]=freeCell(clamp(Math.floor(tx/GS),0,GW-1),clamp(Math.floor(ty/GS),0,GH-1));
+  const N=GW*GH, g=new Float32Array(N).fill(1e9), from=new Int32Array(N).fill(-1), closed=new Uint8Array(N), heap=[];
+  const h=(i)=>{ const x=i%GW,y=(i/GW)|0; return Math.hypot(x-bx,y-by); };
+  const push=(i,f)=>{ heap.push([f,i]); let k=heap.length-1; while(k>0){ const pk=(k-1)>>1; if(heap[pk][0]<=heap[k][0]) break; [heap[pk],heap[k]]=[heap[k],heap[pk]]; k=pk; } };
+  const pop=()=>{ const top=heap[0], last=heap.pop(); if(heap.length){ heap[0]=last; let k=0; for(;;){ const l=2*k+1,r=l+1; let m=k; if(l<heap.length&&heap[l][0]<heap[m][0]) m=l; if(r<heap.length&&heap[r][0]<heap[m][0]) m=r; if(m===k) break; [heap[m],heap[k]]=[heap[k],heap[m]]; k=m; } } return top; };
+  const start=ay*GW+ax, goal=by*GW+bx; g[start]=0; push(start,h(start));
+  while(heap.length){ const [,i]=pop(); if(closed[i]) continue; closed[i]=1; if(i===goal) break; const x=i%GW, y=(i/GW)|0;
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ if(!dx&&!dy) continue; const nx=x+dx, ny=y+dy; if(nx<0||ny<0||nx>=GW||ny>=GH) continue; const j=ny*GW+nx; if(GRID[j]||closed[j]) continue;
+      if(dx&&dy && (GRID[y*GW+nx]||GRID[ny*GW+x])) continue;
+      const ng=g[i]+(dx&&dy?1.414:1)*cellCost(nx,ny); if(ng<g[j]){ g[j]=ng; from[j]=i; push(j,ng+h(j)); } } }
+  if(from[goal]<0 && goal!==start) return null;
+  const cells=[]; for(let i=goal;i!==-1;i=from[i]) cells.push([(i%GW)*GS+GS/2,((i/GW)|0)*GS+GS/2]); cells.reverse();
+  cells[0]=[sx,sy]; cells.push([tx,ty]); return cells;
+}
+function pathLen(pth){ let L=0; for(let i=1;i<pth.length;i++) L+=dist(pth[i-1][0],pth[i-1][1],pth[i][0],pth[i][1]); return L; }
+function guideUpdate(dt){
+  const p=S.p, T=guideOn? nextTask() : null; S.guide=S.guide||{t:0,key:'',path:null,esc:{x:200,y:1150,step:0,face:Math.PI,moving:false},said:''};
+  const gd=S.guide; gd.target=T; gd.t-=dt;
+  if(!T){ gd.path=null; return; }
+  const key=T.id+'|'+S.gateOpen;
+  if(key!==gd.key || gd.t<=0 || !gd.path){ gd.path=findPath(p.x,p.y,T.x,T.y); gd.key=key; gd.t=.6; }
+  if(gd.said!==T.id){ gd.said=T.id; if(T.id==='muster' && S.alarm) toast('🦺 HSE Escort: "Follow me to the MUSTER POINT, quick quick!"'); else toast(`🦺 HSE Escort: "Follow me. Next stop: ${T.name}."`); }
+  // escort walks ahead along the path
+  const e=gd.esc, pth=gd.path; if(!pth) return;
+  let acc=0, goal=pth[pth.length-1];
+  for(let i=1;i<pth.length;i++){ acc+=dist(pth[i-1][0],pth[i-1][1],pth[i][0],pth[i][1]); if(acc>=70){ goal=pth[i]; break; } }
+  const dP=dist(e.x,e.y,p.x,p.y), dG=dist(e.x,e.y,goal[0],goal[1]);
+  e.moving=false;
+  const behind = dist(e.x,e.y,T.x,T.y) > dist(p.x,p.y,T.x,T.y)+30;
+  if(dP>380){ e.x=p.x+(goal[0]-p.x)*.4; e.y=p.y+(goal[1]-p.y)*.4; }
+  else if((dP<170 || behind) && dG>12){ const sp=(S.alarm||behind?175:105)*dt, k=Math.min(1,sp/dG); const dx=(goal[0]-e.x)*k, dy=(goal[1]-e.y)*k; e.x+=dx; e.y+=dy; e.face=Math.atan2(-dx,-dy); e.step+=dt*9; e.moving=true; }
+  else { e.face=Math.atan2(-(p.x-e.x),-(p.y-e.y)); }
+}
+
+
+
+// ================== SHARE RESULT (WhatsApp / email) ==================
+function resultText(rec){
+  return ['SITE LIFE SAFETY INDUCTION RESULT',
+    'Name: '+rec.name, rec.company?('Company: '+rec.company):null, 'Role: '+rec.role,
+    'Result: '+(rec.result==='PASS'?'PASS ✅':'NOT YET (replay needed)'),
+    'Hazards found: '+rec.hazards, 'Mistakes: '+rec.mistakes+(rec.where&&rec.where.length?' ('+rec.where.join('; ')+')':''),
+    'Date: '+rec.date].filter(Boolean).join('\n');
+}
+function shareBlock(rec,pass){
+  const txt=resultText(rec);
+  const wa='https://wa.me/'+(HSE_WA||'')+'?text='+encodeURIComponent(txt);
+  const mail='mailto:'+encodeURIComponent(HSE_MAIL)+'?subject='+encodeURIComponent('Site Life induction result: '+rec.name+' ('+rec.result+')')+'&body='+encodeURIComponent(txt);
+  return `<div class="fb" style="border-left-color:#25D366"><b>📤 Send your result to HSE</b>
+    <div class="row" style="margin-top:8px"><a class="btnlink wa" href="${wa}" target="_blank" rel="noopener">💬 WhatsApp</a><a class="btnlink" href="${mail}" target="_blank" rel="noopener">✉️ Email</a></div>
+    <details style="margin-top:8px"><summary class="muted">Or copy the text</summary><textarea readonly rows="7" style="width:100%;margin-top:6px;font:12px/1.4 system-ui;border-radius:8px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:8px" onclick="this.select()">${esc(txt)}</textarea></details></div>`;
+}
+
+// ================== HSE RESULTS (shared store) ==================
+const cap = (name)=> (window.claude && window.claude.use) ? window.claude.use(name).catch(()=>null) : Promise.resolve(null);
+async function postServer(rec){ // results server (when hosted on our own server)
+  if(!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent/.test(location.hostname)) return false;
+  try{ const r=await fetch('api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:'factory',...rec})}); return r.ok; }catch(e){ return false; }
+}
+async function sendResult(rec){
+  const el=()=>document.getElementById('hseSend'); const show=(t)=>{ if(el()) el().textContent=t; };
+  try{
+    const [db,user]=await Promise.all([cap('db'),cap('user')]);
+    const uid = user ? await user.id() : null;
+    if(!db || !uid){ show(await postServer(rec) ? '✅ Your result has been sent to HSE.' : 'ℹ️ Use the WhatsApp or email button below to send your result to HSE.'); return; }
+    const ref=db.doc('results/'+uid); const snap=await ref.get(); const old=snap.exists?snap.data():{};
+    const attempts=[...(old.attempts||[]), rec].slice(-20);
+    await ref.set({name:rec.name, role:rec.role, last:rec, attempts, passedEver: !!(old.passedEver || rec.result==='PASS'), updatedAt:Date.now()});
+    show('✅ Your result has been sent to HSE.');
+  }catch(e){ show(e && e.code==='invalid_argument' ? 'ℹ️ This link cannot save results automatically. Use the WhatsApp or email button below to send your result to HSE.' : '⚠️ Could not send your result to HSE automatically. Use the WhatsApp or email button below.'); }
+}
+let dashUnsub=null;
+async function openDashboard(){
+  const [db,user]=await Promise.all([cap('db'),cap('user')]);
+  const m=openModal(`<h2>📊 HSE Dashboard</h2><p class="muted">Everyone who has played this induction from the company link. Updates live.</p><div id="dashBody"><p class="muted">Loading…</p></div>
+    <div class="row" style="margin-top:12px"><button id="csv">⬇️ Export CSV</button><button class="primary" id="dclose">Close</button></div><div id="csvMsg" class="muted"></div>`);
+  const close=()=>{ if(dashUnsub){ dashUnsub(); dashUnsub=null; } closeModal(); if(!started || S.over) showStart(); };
+  m.querySelector('#dclose').onclick=close;
+  let rows=[];
+  if(!db){ m.querySelector('#dashBody').innerHTML='<p>The results store is not available in this view. Open the game from its claude.ai link.</p>'; m.querySelector('#csv').disabled=true; return; }
+  const render=async()=>{
+    const body=m.querySelector('#dashBody'); if(!body) return;
+    if(!rows.length){ body.innerHTML='<p>No results yet. Share the game link with new staff and visitors; their results will appear here.</p>'; return; }
+    const ps = user ? await user.profiles(rows.map(r=>r.id)) : {};
+    const total=rows.length, passed=rows.filter(r=>r.d.last&&r.d.last.result==='PASS').length;
+    const mc={}; rows.forEach(r=>(r.d.attempts||[]).forEach(a=>(a.where||[]).forEach(w=>mc[w]=(mc[w]||0)+1)));
+    const top=Object.entries(mc).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    body.innerHTML=`<div class="row" style="margin-bottom:10px"><span class="pill">👥 ${total} players</span><span class="pill">✅ ${passed} cleared</span><span class="pill">📈 ${Math.round(passed/total*100)}% pass rate</span></div>
+      ${top.length?`<p style="margin:.4em 0"><b>Most common mistakes</b></p><ul style="margin:0 0 10px">${top.map(([w,n])=>`<li>${esc(w)}: ${n}</li>`).join('')}</ul>`:''}
+      <div style="overflow-x:auto"><table><tr><th>Name</th><th>Account</th><th>Role</th><th>Latest</th><th>Tries</th><th>Hazards</th><th>Mistakes</th><th>When</th></tr><tbody id="dt"></tbody></table></div>`;
+    const tb=body.querySelector('#dt');
+    rows.sort((a,b)=>(b.d.updatedAt||0)-(a.d.updatedAt||0)).forEach(r=>{ const d=r.d, l=d.last||{}; const tr=document.createElement('tr');
+      [d.name||'', (ps[r.id]&&ps[r.id].name)||'—', d.role||'', (l.result==='PASS'?'✅ PASS':'🔁 REPLAY'), String((d.attempts||[]).length), l.hazards||'', String(l.mistakes??''), l.date||''].forEach(v=>{ const td=document.createElement('td'); td.textContent=v; tr.appendChild(td); }); tb.appendChild(tr); });
+  };
+  dashUnsub=db.collection('results').onSnapshot(snap=>{ rows=snap.docs.filter(d=>d.exists).map(d=>({id:d.id,d:d.data()})); render(); }, err=>{ const b=m.querySelector('#dashBody'); if(b) b.innerHTML='<p>Could not load results ('+esc(err.code)+').</p>'; });
+  m.querySelector('#csv').onclick=async()=>{
+    const dl=await cap('downloads'); const msg=m.querySelector('#csvMsg');
+    if(!dl){ msg.textContent='Download is not available in this view.'; return; }
+    const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    const lines=[['Name','Role','Result','Tries','Hazards found','Mistakes','Mistake areas','Date'].map(q).join(',')];
+    rows.forEach(r=>{ const d=r.d,l=d.last||{}; lines.push([d.name,d.role,l.result,(d.attempts||[]).length,l.hazards,l.mistakes,(l.where||[]).join('; '),l.date].map(q).join(',')); });
+    try{ await dl.save({filename:'site-life-induction-results.csv', data:lines.join('\n')}); msg.textContent='Saved.'; }catch(e){ msg.textContent = e.code==='declined'?'':'Could not save the file.'; }
+  };
+}
+async function showDashButton(container){
+  const user=await cap('user'); if(!user) return; const ok=await user.canEdit(); if(!ok || !container) return;
+  const b=document.createElement('button'); b.textContent='📊 HSE Dashboard'; b.onclick=()=>{ closeModal(); openDashboard(); }; container.appendChild(b);
+}
+
+// ================== COLLISION ==================
+let SOLIDS_BASE = null;
+function solids(){
+  if(!SOLIDS_BASE){
+    const s = BUILD.map(b=>({x:b.x,y:b.y,w:b.w,h:b.h}));
+    s.push({x:FENCE.l-10,y:FENCE.t-10,w:FENCE.r-FENCE.l+20,h:10});
+    s.push({x:FENCE.l-10,y:FENCE.t,w:10,h:FENCE.b-FENCE.t});
+    s.push({x:FENCE.r,y:FENCE.t,w:10,h:FENCE.b-FENCE.t});
+    s.push({x:FENCE.l-10,y:FENCE.b,w:FENCE.gateL-FENCE.l+10,h:10});
+    s.push({x:FENCE.gateR,y:FENCE.b,w:FENCE.r-FENCE.gateR+10,h:10});
+    s.push({x:1400,y:80,w:140,h:220});
+    s.push(TRUCK); PARKED.forEach(c=>s.push(c));
+    s.push({x:0,y:H-2,w:W,h:2}); s.push({x:0,y:0,w:4,h:H}); s.push({x:W-4,y:0,w:4,h:H});
+    SOLIDS_BASE = s;
+  }
+  return S.gateOpen ? SOLIDS_BASE : SOLIDS_BASE.concat([{x:FENCE.gateL,y:FENCE.b-2,w:FENCE.gateR-FENCE.gateL,h:12}]);
+}
+function blocked(x,y,r,sol){
+  for(const b of sol){ const cx=clamp(x,b.x,b.x+b.w), cy=clamp(y,b.y,b.y+b.h); if((x-cx)**2+(y-cy)**2 < r*r) return true; }
+  return false;
+}
+
+// ================== UPDATE ==================
+function update(dt){
+  S.t += dt;
+  const p=S.p, sol=solids();
+  // look with arrow keys / Q E-less rotation
+  if(keys.ArrowLeft) yaw += 2.2*dt; if(keys.ArrowRight) yaw -= 2.2*dt;
+  let fwd=0, str=0;
+  if(keys.KeyW||keys.ArrowUp) fwd+=1; if(keys.KeyS||keys.ArrowDown) fwd-=1;
+  if(keys.KeyD) str+=1; if(keys.KeyA) str-=1;
+  if(joy){ fwd=-joy.dy; str=joy.dx; }
+  const fx=-Math.sin(yaw), fy=-Math.cos(yaw), rx=Math.cos(yaw), ry=-Math.sin(yaw);
+  let mx=fx*fwd+rx*str, my=fy*fwd+ry*str; const len=Math.hypot(mx,my);
+  p.moving = len>0.1;
+  if(p.moving){
+    const sp = 120*(len>1?1/len:1); mx*=sp; my*=sp; const r=13;
+    if(!blocked(p.x+mx*dt,p.y,r,sol)) p.x+=mx*dt;
+    if(!blocked(p.x,p.y+my*dt,r,sol)) p.y+=my*dt;
+    p.x=clamp(p.x,10,W-10); p.y=clamp(p.y,10,H-10);
+    p.face=Math.atan2(-mx,-my); p.step+=dt*9;
+  }
+  // forklift
+  const f=S.forklift, inLane = p.y>LANE.y1-6 && p.y<LANE.y2+6 && p.x>LANE.x1 && p.x<LANE.x2;
+  const onCross = CROSS.some(c=>p.x>c.x1-4 && p.x<c.x2+4);
+  const ahead = (p.x-f.x)*f.dir;
+  f.stop = inLane && ahead>0 && ahead<170;
+  if(!f.stop){ f.x+=f.dir*110*dt; if(f.x>LANE.x2-60) f.dir=-1; if(f.x<LANE.x1+60) f.dir=1; }
+  if(inLane && !onCross && !('forklift' in S.results)){
+    complete('forklift',false); S.mistakes.push({where:'Forklift Lane',why:'You cut across the forklift lane. Only cross at the zebra crossing, where drivers expect people.'});
+    S.bars.site=clamp(S.bars.site-1,0,10); toast('⚠️ You are in the forklift lane! Only cross at the zebra crossing.','bad'); buzz();
+  }
+  if(inLane && onCross && !('forklift' in S.results)){ complete('forklift',true); toast('✅ Nice. You used the zebra crossing and the forklift stopped for you.'); chime(); }
+  if(inLane && Math.abs(p.x-f.x)<44 && Math.abs(p.y-440)<44 && !onCross && S.t-S.lastHit>2){
+    S.lastHit=S.t; S.bars.health=clamp(S.bars.health-4,0,10); toast('💥 The forklift hit you! Health −4. The driver could not see you.','bad'); buzz(); G.shake=0.6;
+    S.mistakes.push({where:'Forklift Lane',why:'You were hit by a forklift. Stay on walkways and only cross at the zebra crossing.'});
+    p.y = p.y<440 ? LANE.y1-20 : LANE.y2+20;
+  }
+  // reversing van
+  const v=S.van;
+  if(v.wait>0) v.wait-=dt; else { v.y += v.dir*45*dt; if(v.y<900){v.dir=1;v.wait=2;} if(v.y>1050){v.dir=-1;v.wait=2;} }
+  const reversing = v.dir<0 && v.wait<=0;
+  if(reversing && Math.floor(S.t*2)%2===0 && Math.floor((S.t-dt)*2)%2!==0 && dist(p.x,p.y,1360,v.y)<380) beep(1150,.08,'square',.03);
+  if(!('carpark' in S.results) && dist(p.x,p.y,1360,v.y-40)<130) scenario(SC.carpark,'Car Park',o=>complete('carpark',o.ok));
+  const inMuster = dist(p.x,p.y,MUSTER.x,MUSTER.y)<MUSTER.r;
+  if(!('muster' in S.results) && inMuster && !S.alarm && !paused) scenario(SC.muster,'Muster Point',o=>complete('muster',o.ok));
+  // noise area
+  // consequences of missing PPE (once each)
+  const pp=p.ppe, hit=(k,cond,fx,msg)=>{ if(cond && !S.ppeHit[k] && ('reception' in S.results)){ S.ppeHit[k]=1; for(const b in fx) S.bars[b]=clamp(S.bars[b]+fx[b],0,10); S.mistakes.push({where:'Missing PPE',why:msg}); toast('💥 '+msg,'bad'); buzz(); G.shake=.4; } };
+  hit('eyes', !pp.goggles && dist(p.x,p.y,1030,300)<140, {eyes:-3}, 'A grinding spark flew into your eye at the Workshop. You had no safety goggles.');
+  hit('head', !pp.hat && dist(p.x,p.y,770,524)<120, {health:-3}, 'A carton fell from the top rack onto your head at the Warehouse. You had no hard hat.');
+  hit('feet', !pp.boots && dist(p.x,p.y,920,900)<150, {health:-2}, 'A pallet jack rolled over your foot at the Loading Bay. You had no safety boots.');
+  hit('vest', !pp.vest && Math.abs(p.x-S.forklift.x)<180 && p.y>340 && p.y<540, {health:-1,site:-1}, 'The forklift driver nearly hit you. Without a hi-vis vest he could not see you.');
+  hit('hands', !pp.gloves && needsGloves() && (dist(p.x,p.y,770,524)<120 || dist(p.x,p.y,1085,544)<120), {health:-1}, 'You cut your hand on a sharp edge. Your job needs work gloves.');
+  if(dist(p.x,p.y,NOISE.x,NOISE.y)<NOISE.r && !S.alarm && !p.ppe.muffs){
+    S.bars.hearing=clamp(S.bars.hearing-0.6*dt,0,10);
+    if(S.t-S.noiseToastAt>6){S.noiseToastAt=S.t; toast('🔊 Too loud! No ear plugs. Your hearing is being damaged.','warn'); beep(3000,.25,'sine',.015);}
+  }
+  if(S.nepa>0) S.nepa-=dt;
+  if(S.rain>0) S.rain-=dt;
+  // alarm
+  if(S.alarm && !S.alarm.done){
+    S.alarm.left-=dt; S.smokeR+=dt*9;
+    if(Math.floor(S.t*1.5)%2===0) beep(Math.floor(S.t*1.5)%4<2?900:700,.05,'square',.02);
+    if(dist(p.x,p.y,1030,300)<S.smokeR && p.y>280){ S.bars.lungs=clamp(S.bars.lungs-1.4*dt,0,10); if(S.t-S.smokeToastAt>4){S.smokeToastAt=S.t; toast('😷 Smoke! Move away. Stay low and keep going.','bad');} }
+    S.workers.forEach(w=>{ const a=Math.atan2(MUSTER.y-w.y,MUSTER.x-w.x); if(dist(w.x,w.y,MUSTER.x,MUSTER.y)>30){ w.x+=Math.cos(a)*80*dt; w.y+=Math.sin(a)*80*dt; w.step+=dt*9; w.face=Math.atan2(-Math.cos(a),-Math.sin(a)); } });
+    $('timer').textContent='🚨 '+Math.max(0,Math.ceil(S.alarm.left))+'s';
+    if(inMuster){ S.alarm.done=true; toast('✅ You made it to the Muster Point! The fire warden has counted you.'); endGame(); return; }
+    if(S.alarm.left<=0){ S.mistakes.push({where:'Fire alarm',why:'You did not reach the muster point in time. Know your route before you need it.'}); endGame(); return; }
+  }
+  if(S.bars.health<=0 && !S.fatal){ S.fatal='Your health reached zero.'; endGame(); return; }
+  if(S.bars.lungs<=0 && !S.fatal){ S.fatal='You collapsed from breathing smoke or fumes.'; endGame(); return; }
+  guideUpdate(dt);
+  const near = interactables().filter(i=>dist(p.x,p.y,i.x,i.y)<i.r).sort((a,b)=>dist(p.x,p.y,a.x,a.y)-dist(p.x,p.y,b.x,b.y))[0];
+  S.near = near;
+  if(autoQ && near && near.auto && !paused && dist(p.x,p.y,near.x,near.y)<near.r*.75){ near.run(); return; }
+  if(near){ $('prompt').textContent=near.name; $('prompt').classList.remove('hidden'); $('act').textContent=near.label; $('act').disabled=false; }
+  else { $('prompt').classList.add('hidden'); $('act').textContent='E'; $('act').disabled=true; }
+}
+function doAct(){ if(!paused && S && S.near){ ensureAudio(); S.near.run(); } }
+
+/*@@COMMON@@*/
+/*@@ENGINE@@*/
+// ---------- world build ----------
+function initThree(){
+  const canvas=$('game');
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'}); RENDERER=renderer;
+  const LOW = Math.min(innerWidth,innerHeight)<700 || /Android|iPhone|iPad/i.test(navigator.userAgent);
+  renderer.setPixelRatio(LOW?1:Math.min(1.5,window.devicePixelRatio||1));
+  renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=.8;
+  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  buildTextures(); BLOB=blobTex();
+  const rec=NPCS.find(n=>n.label==='Receptionist').look; rec.topMap=ankara('#7b1fa2','#f39c12','#1abc9c'); rec.gele=ankara('#f39c12','#7b1fa2','#ffffff');
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(58,1,0.08,700); camera.rotation.order='YXZ';
+  // sky + environment lighting
+  const pmrem=new THREE.PMREMGenerator(renderer);
+  let sky=null; const skyScene=new THREE.Scene();
+  if(THREE.Sky){ sky=new THREE.Sky(); sky.scale.setScalar(4500); scene.add(sky); }
+  const sunDir=new THREE.Vector3();
+  function setSky(o){
+    const el=THREE.MathUtils.degToRad(90-o.elev), az=THREE.MathUtils.degToRad(o.az); sunDir.setFromSphericalCoords(1,el,az);
+    if(sky){ const u=sky.material.uniforms; u.turbidity.value=o.turb; u.rayleigh.value=o.ray; u.mieCoefficient.value=o.mie; u.mieDirectionalG.value=.8; u.sunPosition.value.copy(sunDir);
+      if(G&&G.envRT) G.envRT.dispose(); const tmp=new THREE.Scene(); const s2=new THREE.Sky(); s2.scale.setScalar(4500); s2.material.uniforms.turbidity.value=o.turb; s2.material.uniforms.rayleigh.value=o.ray; s2.material.uniforms.mieCoefficient.value=o.mie; s2.material.uniforms.mieDirectionalG.value=.8; s2.material.uniforms.sunPosition.value.copy(sunDir); tmp.add(s2);
+      const rt=pmrem.fromScene(tmp); scene.environment=rt.texture; if(G) G.envRT=rt; else initEnv=rt; }
+    else { scene.background=lin(o.fallback); }
+  }
+  let initEnv=null;
+  const SKIES={ day:{elev:48,az:150,turb:3.2,ray:1.1,mie:.004,fallback:'#a8c7e0',exp:.62,fog:'#bfd0de'}, rain:{elev:40,az:150,turb:20,ray:4,mie:.05,fallback:'#7d8791',exp:.45,fog:'#8a949c'}, nepa:{elev:4,az:250,turb:12,ray:3,mie:.02,fallback:'#3a3440',exp:.35,fog:'#6f6670'} };
+  setSky(SKIES.day);
+  scene.fog=new THREE.Fog(lin(SKIES.day.fog),70,330);
+  const hemi=new THREE.HemisphereLight(lin('#dfeaf5'),lin('#6b6150'),.35); scene.add(hemi);
+  const sun=new THREE.DirectionalLight(lin('#fff1d6'),2.4); sun.castShadow=true; sun.shadow.mapSize.set(LOW?1024:2048,LOW?1024:2048);
+  const sc=sun.shadow.camera; sc.left=-34; sc.right=34; sc.top=34; sc.bottom=-34; sc.near=1; sc.far=160; sun.shadow.bias=-.0004; sun.shadow.normalBias=.03;
+  scene.add(sun,sun.target);
+  const alarmLight=new THREE.PointLight(lin('#ff2020'),0,70,2); alarmLight.position.set(X(1030),9,Z(330)); scene.add(alarmLight);
+  const fireLight=new THREE.PointLight(lin('#ff7a1a'),0,25,2); fireLight.position.set(X(1030),2.5,Z(300)); scene.add(fireLight);
+
+  // ground
+  const G_MAT=(t,n,rx,ry,r=.9,col='#ffffff')=>{ const m=std(col,{r}); m.map=tex(t,rx,ry); if(n){ m.normalMap=tex(n,rx,ry,false); m.normalScale=new THREE.Vector2(.8,.8);} return m; };
+  const plane=(w,d,mat,x,z,y=0)=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),mat); m.rotation.x=-Math.PI/2; m.position.set(x,y,z); m.receiveShadow=true; scene.add(m); return m; };
+  plane(600,600,G_MAT(TX.grass,null,150,150,.95),X(W/2),Z(H/2)+40,-.03);
+  const yardMat=G_MAT(TX.pavers,TX.paversN,X(FENCE.r-FENCE.l)/1.6,Z(FENCE.b-FENCE.t)/1.6,.85);
+  const yard=plane(X(FENCE.r-FENCE.l),Z(FENCE.b-FENCE.t),yardMat,X((FENCE.l+FENCE.r)/2),Z((FENCE.t+FENCE.b)/2),0);
+  const asphalt=(x1,y1,x2,y2,y=.006)=>plane(X(x2-x1),Z(y2-y1),G_MAT(TX.asphalt,TX.asphaltN,X(x2-x1)/4,Z(y2-y1)/4,.92),X((x1+x2)/2),Z((y1+y2)/2),y);
+  const streetMat = asphalt(-3000,FENCE.b+60,4600,H+200,0.004).material;
+  asphalt(80,60,240,FENCE.b+60); asphalt(LANE.x1,LANE.y1,LANE.x2,LANE.y2,.008); asphalt(1020,820,1400,1140,.007);
+  plane(X(380),Z(200),G_MAT(TX.concrete,TX.concreteN,X(380)/4,Z(200)/4,.9),X(770),Z(890),.007);
+  plane(X(160),Z(180),G_MAT(TX.grass,null,3,3,.95),X(1480),Z(790),.009); plane(X(FENCE.r-FENCE.l),Z(24),G_MAT(TX.grass,null,25,1,.95),X(800),Z(FENCE.t+12),.009);
+  // walkway + markings overlay
+  const msc=1.92, mk=mkCanvas(Math.round(W*msc),Math.round(H*msc),(cx)=>{ cx.scale(msc,msc);
+    cx.fillStyle='rgba(235,190,30,.85)'; cx.fillRect(LANE.x1,360,LANE.x2-LANE.x1,34); cx.fillRect(LANE.x1,486,LANE.x2-LANE.x1,40);
+    cx.fillStyle='rgba(30,25,0,.85)'; cx.font='bold 15px system-ui'; for(let x=LANE.x1+40;x<LANE.x2;x+=260){ cx.fillText('PEDESTRIAN WALKWAY ▸',x,382); cx.fillText('PEDESTRIAN WALKWAY ▸',x,511); }
+    cx.fillStyle='rgba(240,190,20,.95)'; cx.fillRect(LANE.x1,LANE.y1,LANE.x2-LANE.x1,3); cx.fillRect(LANE.x1,LANE.y2-3,LANE.x2-LANE.x1,3);
+    cx.fillStyle='rgba(255,255,255,.75)'; cx.font='bold 18px system-ui'; for(let x=LANE.x1+120;x<LANE.x2;x+=300) cx.fillText('FORKLIFTS ONLY',x,447);
+    CROSS.forEach(c=>{ cx.fillStyle='rgba(250,250,250,.92)'; for(let y=LANE.y1+6;y<LANE.y2-6;y+=12) cx.fillRect(c.x1,y,c.x2-c.x1,6); });
+    cx.strokeStyle='rgba(245,245,245,.85)'; cx.setLineDash([18,14]); cx.lineWidth=2.5; cx.beginPath(); cx.moveTo(160,70); cx.lineTo(160,FENCE.b+40); cx.stroke();
+    cx.beginPath(); cx.moveTo(-10,H-35); cx.lineTo(W+10,H-35); cx.stroke(); cx.setLineDash([]);
+    cx.strokeStyle='rgba(240,190,20,.9)'; cx.lineWidth=3; for(let x=600;x<960;x+=90){cx.beginPath();cx.moveTo(x,790);cx.lineTo(x,980);cx.stroke();}
+    cx.strokeStyle='rgba(245,245,245,.9)'; cx.lineWidth=2; for(let x=1030;x<1400;x+=100) cx.strokeRect(x,1080,80,56);
+    cx.fillStyle='rgba(30,140,62,.55)'; cx.beginPath(); cx.arc(MUSTER.x,MUSTER.y,MUSTER.r,0,7); cx.fill(); cx.strokeStyle='rgba(20,110,50,.95)'; cx.lineWidth=4; cx.stroke();
+    cx.fillStyle='rgba(255,255,255,.95)'; cx.font='bold 14px system-ui'; cx.textAlign='center'; cx.fillText('ASSEMBLY',MUSTER.x,MUSTER.y-2); cx.fillText('POINT',MUSTER.x,MUSTER.y+15);
+    cx.strokeStyle='rgba(220,90,30,.55)'; cx.setLineDash([10,10]); cx.lineWidth=3; cx.beginPath(); cx.arc(NOISE.x,NOISE.y,NOISE.r,0,7); cx.stroke(); cx.setLineDash([]);
+    cx.fillStyle='rgba(0,0,0,.35)'; cx.fillRect(0,FENCE.b+22,W,18);
+  });
+  const mkT=tex(mk,1,1); mkT.wrapS=mkT.wrapT=THREE.ClampToEdgeWrapping;
+  const markMat=new THREE.MeshStandardMaterial({map:mkT,transparent:true,roughness:.7,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
+  plane(X(W),Z(H),markMat,X(W/2),Z(H/2),.012);
+  // drain/gutter outside wall
+  scene.add(bx(X(W)+60,.25,.6,std('#7c7a74',{map:tex(TX.concrete,40,1),r:.9}),X(W/2),-.08,Z(FENCE.b)+1.5,false));
+
+  // buildings
+  const glass=std('#22303b',{r:.04,m:.9,emissive:'#ffdcae',emissiveIntensity:.0}); glass.envMapIntensity=1.4;
+  const frameM=std('#c9cdd1',{r:.35,m:.8}), sillM=std('#d8d4ca',{r:.9}), barM=std('#2a2a2a',{r:.5,m:.6}), acM=std('#f2f2f2',{r:.45}), skirt=std('#6d6a66',{r:.9});
+  const winGeo=new THREE.BoxGeometry(1,1,1);
+  for(const b of BUILD){
+    const w=X(b.w), d=Z(b.h), cx0=X(b.x)+w/2, cz0=Z(b.y)+d/2, shed=(b.id==='warehouse'||b.id==='workshop');
+    let wallMat;
+    if(shed){ wallMat=std(b.c,{r:.5,m:.55}); wallMat.map=tex(TX.corr,w/1.2,b.ht/3); wallMat.normalMap=tex(TX.corrN,w/1.2,b.ht/3,false); }
+    else { wallMat=std(b.c,{r:.92}); wallMat.map=tex(TX.plaster,w/4,b.ht/4); wallMat.normalMap=tex(TX.plasterN,w/4,b.ht/4,false); wallMat.normalScale=new THREE.Vector2(.5,.5); }
+    const roofM = shed? (()=>{ const m=std('#a9adb1',{r:.45,m:.7}); m.map=tex(TX.corr,w/1.2,1); m.normalMap=tex(TX.corrN,w/1.2,1,false); return m; })() : std('#8a8580',{r:.95,map:tex(TX.concrete,w/4,d/4)});
+    const main=bx(w,b.ht,d,[wallMat,wallMat,roofM,roofM,wallMat,wallMat],cx0,b.ht/2,cz0); scene.add(main);
+    // AO on ground
+    const ao=plane(w+4,d+4,new THREE.MeshBasicMaterial({map:aoTex(w,d,2),transparent:true,depthWrite:false}),cx0,cz0,.02); ao.receiveShadow=false;
+    if(shed){ // pitched roof
+      const rg=new THREE.BufferGeometry(); const hh=1.4, y0=b.ht;
+      const v=[ -w/2,y0,-d/2-.3,  w/2,y0,-d/2-.3,  w/2,y0+hh,0,  -w/2,y0+hh,0,   -w/2,y0+hh,0, w/2,y0+hh,0, w/2,y0,d/2+.3, -w/2,y0,d/2+.3 ];
+      rg.setAttribute('position',new THREE.Float32BufferAttribute(v,3)); rg.setIndex([0,2,1,0,3,2,4,6,5,4,7,6]); rg.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,w/1.2,0,w/1.2,1,0,1, 0,1,w/1.2,1,w/1.2,0,0,0],2)); rg.computeVertexNormals();
+      const rm=std('#9da2a6',{r:.4,m:.75,side:THREE.DoubleSide}); rm.map=tex(TX.corr,1,1); rm.normalMap=tex(TX.corrN,1,1,false);
+      const roof=new THREE.Mesh(rg,rm); roof.position.set(cx0,0,cz0); roof.castShadow=true; roof.receiveShadow=true; scene.add(roof);
+      const gable=new THREE.Shape([new THREE.Vector2(-w/2,0),new THREE.Vector2(w/2,0),new THREE.Vector2(0,hh)].map(p=>p)); const gg=new THREE.ShapeGeometry(gable);
+      for(const s of [-1,1]){ const gm=new THREE.Mesh(gg,wallMat); gm.rotation.y=Math.PI/2; gm.position.set(cx0+s*w/2,b.ht,cz0); gm.scale.x=d/w; scene.add(gm); }
+      // trim band
+      scene.add(bx(w+.08,.35,d+.08,std('#1f4e8c',{r:.5,m:.3}),cx0,b.ht-.2,cz0,false));
+    } else {
+      scene.add(bx(w+.25,.9,d+.25,wallMat,cx0,b.ht+.45,cz0)); scene.add(bx(w+.35,.08,d+.35,sillM,cx0,b.ht+.94,cz0));
+      scene.add(bx(w+.04,.45,d+.04,skirt,cx0,.22,cz0,false));
+    }
+    // door & signage
+    if(b.door){
+      const dd=b.door; let nx=0,nz=0,px,pz,ry=0;
+      if(dd.y<b.y){ nz=-1; px=X(dd.x); pz=Z(b.y); ry=0; } else if(dd.y>b.y+b.h){ nz=1; px=X(dd.x); pz=Z(b.y+b.h); ry=Math.PI; } else { nx=-1; px=X(b.x); pz=Z(dd.y); ry=Math.PI/2; }
+      const grp=new THREE.Group(); grp.position.set(px,0,pz); grp.rotation.y=ry; scene.add(grp);
+      if(shed){ const sm=std('#c4c7cb',{r:.4,m:.7}); sm.map=tex(TX.shutter,1,2); sm.normalMap=tex(TX.shutterN,1,2,false); grp.add(bx(4,4.2,.12,sm,0,2.1,-.02)); grp.add(bx(4.3,.35,.4,std('#555',{r:.6,m:.5}),0,4.35,-.15)); grp.add(bx(1,2.2,.06,std('#405060',{r:.4,m:.6}),3,1.1,-.03)); }
+      else { grp.add(bx(1.4,2.45,.12,frameM,0,1.22,-.02)); grp.add(bx(1.2,2.3,.1,std(b.id==='electrical'?'#7a8a96':'#5b3a24',{r:.55,m:b.id==='electrical'?.6:0}),0,1.15,-.05));
+        grp.add(bx(2.2,.15,1.1,sillM,0,2.75,-.55)); grp.add(bx(.06,.04,.25,frameM,.45,1.1,-.12,false)); }
+      const sb=boardCanvas(b.name==='SECURITY'?'SECURITY POST':b.name); const sp=new THREE.Mesh(new THREE.PlaneGeometry(sb.width/110*.55,.55),std('#fff',{map:tex(sb),r:.5})); sp.position.set(0,shed?5.0:3.3,-.08); sp.rotation.y=Math.PI; grp.add(sp);
+    }
+    // windows (instanced)
+    if(!shed){
+      const floors=Math.max(1,Math.floor(b.ht/3.2)), faces=[[0,-1,w],[0,1,w],[-1,0,d],[1,0,d]];
+      for(const [fx,fz,len] of faces){
+        const n=Math.floor((len-1.5)/3.4);
+        for(let f=0;f<floors;f++) for(let i=0;i<n;i++){
+          const off=-len/2+ (len-(n-1)*3.4)/2 + i*3.4, y=f*3.2+1.65;
+          const wx=cx0+(fz!==0?off:fx*w/2), wz=cz0+(fx!==0?off:fz*d/2), ry=0;
+          if(b.door){ const ddx=X(b.door.x), ddz=Z(b.door.y); if(Math.hypot(wx-ddx,wz-ddz)<2.2 && f===0) continue; }
+          const ox=fx*.0, oz=fz*.0, nxv=fx, nzv=fz;
+          inst('frame',winGeo,frameM,M4(wx+nxv*.03,y,wz+nzv*.03,ry,fx?0.12:1.5,1.35,fx?1.5:0.12));
+          inst('glass',winGeo,glass,M4(wx+nxv*.05,y,wz+nzv*.05,ry,fx?0.12:1.36,1.21,fx?1.36:0.12));
+          inst('mull',winGeo,frameM,M4(wx+nxv*.1,y,wz+nzv*.1,ry,fx?0.05:.05,1.21,fx?.05:.05));
+          inst('sill',winGeo,sillM,M4(wx+nxv*.1,y-.72,wz+nzv*.1,ry,fx?.22:1.7,.08,fx?1.7:.22));
+          for(let k=-2;k<=2;k++){ if(k===0) continue; const kk=k*.27; inst('bar',winGeo,barM,M4(wx+nxv*.14+(fz?kk:0),y,wz+nzv*.14+(fx?kk:0),ry,.025,1.25,.025)); }
+          if((i+f)%3===1){ inst('ac',winGeo,acM,M4(wx+nxv*.2+(fz?1:0),y-1.15,wz+nzv*.2+(fx?1:0),ry,fx?.25:.85,.3,fx?.85:.25)); }
+        }
+      }
+    }
+  }
+  // perimeter wall with coping + razor wire
+  const wallM=std('#efe6d2',{r:.92}); wallM.map=tex(TX.block,1,1); wallM.normalMap=tex(TX.blockN,1,1,false);
+  const copeM=std('#cfc8b8',{r:.9});
+  const pwall=(x1,y1,x2,y2)=>{ const len=Math.hypot(X(x2-x1),Z(y2-y1)); const horiz=y1===y2; const m=wallM.clone(); m.map=tex(TX.block,len/4,.65); m.normalMap=tex(TX.blockN,len/4,.65,false);
+    scene.add(bx(horiz?len:.25,2.6,horiz?.25:len,m,X((x1+x2)/2),1.3,Z((y1+y2)/2))); scene.add(bx(horiz?len+.1:.38,.1,horiz?.38:len+.1,copeM,X((x1+x2)/2),2.65,Z((y1+y2)/2),false));
+    const steps=Math.floor(len/.4); for(let i=0;i<steps;i++){ const t=(i+.5)/steps; const px=X(x1+(x2-x1)*t), pz=Z(y1+(y2-y1)*t); inst('razor',new THREE.TorusGeometry(.22,.008,4,14),std('#b0b4b8',{r:.3,m:.9}),new THREE.Matrix4().compose(new THREE.Vector3(px,2.92,pz),new THREE.Quaternion().setFromEuler(new THREE.Euler(0,horiz?0:Math.PI/2,i*.3)),new THREE.Vector3(1,1,1))); }
+    for(let i=0;i<=Math.floor(len/3);i++){ const t=i/Math.max(1,Math.floor(len/3)); scene.add(bx(.38,2.75,.38,copeM,X(x1+(x2-x1)*t),1.37,Z(y1+(y2-y1)*t),false)); } };
+  pwall(FENCE.l,FENCE.t,FENCE.r,FENCE.t); pwall(FENCE.l,FENCE.t,FENCE.l,FENCE.b); pwall(FENCE.r,FENCE.t,FENCE.r,FENCE.b);
+  pwall(FENCE.l,FENCE.b,FENCE.gateL,FENCE.b); pwall(FENCE.gateR,FENCE.b,FENCE.r,FENCE.b);
+  // gate: pillars, sliding steel gate (open), barrier
+  const gp=std('#e9e2d3',{r:.9}); scene.add(bx(.8,3.4,.8,gp,X(FENCE.gateL)-.3,1.7,Z(FENCE.b)), bx(.8,3.4,.8,gp,X(FENCE.gateR)+.3,1.7,Z(FENCE.b)));
+  const gateM=std('#1d1f22',{r:.5,m:.7}); const gate=new THREE.Group(); for(let i=0;i<20;i++) gate.add(bx(.04,2.4,.04,gateM,i*.3,1.3,0)); gate.add(bx(6,.1,.1,gateM,2.85,.15,0), bx(6,.1,.1,gateM,2.85,2.45,0), bx(6,.08,.08,gateM,2.85,1.3,0));
+  consolidate(gate); gate.position.set(X(FENCE.gateR)+.8,0,Z(FENCE.b)+.35); scene.add(gate);
+  const barrier=new THREE.Group(); barrier.position.set(X(FENCE.gateL)+.1,1.05,Z(FENCE.b)-.35);
+  const bt=tex(mkCanvas(128,16,(c)=>{ for(let i=0;i<8;i++){ c.fillStyle=i%2?'#d22':'#fff'; c.fillRect(i*16,0,16,16);} }),1,1);
+  const pole=bx(X(FENCE.gateR-FENCE.gateL)-.6,.12,.12,std('#fff',{map:bt,r:.4}),(X(FENCE.gateR-FENCE.gateL)-.6)/2,0,0); barrier.add(pole); scene.add(barrier);
+  scene.add(bx(.35,1.1,.35,std('#d9a400',{r:.5}),X(FENCE.gateL)+.1,.55,Z(FENCE.b)-.35));
+  const plq=boardCanvas('ACME MANUFACTURING LTD · IKEJA','#0f5132'); const pm=new THREE.Mesh(new THREE.PlaneGeometry(plq.width/110*.5,.5),std('#fff',{map:tex(plq),r:.5})); pm.position.set(X(FENCE.gateR)+5,2.0,Z(FENCE.b)+.14); scene.add(pm);
+  // safety signs
+  const wallSign=(kind,t1,t2,x,y,yy,ry)=>{ const p=new THREE.Mesh(new THREE.PlaneGeometry(.6,.75),std('#fff',{map:tex(signCanvas(kind,t1,t2)),r:.5,side:THREE.DoubleSide})); p.position.set(X(x),yy,Z(y)); p.rotation.y=ry; scene.add(p); return p; };
+  const postSign=(kind,t1,t2,x,y,ry=0)=>{ scene.add(cyl(.04,.04,2.2,std('#888',{m:.8,r:.4}),X(x),1.1,Z(y),8)); wallSign(kind,t1,t2,x,y,2.0,ry).position.y=2.0; };
+  wallSign('mandatory','EAR','PROTECTION',985,282,2.3,0); wallSign('warning','DANGER','HIGH VOLTAGE',1040,557,2.0,Math.PI);
+  postSign('prohibit','NO','SMOKING',1395,330,0); postSign('safe','ASSEMBLY','POINT',MUSTER.x+40,MUSTER.y-50,-Math.PI*.75);
+  postSign('warning','FORKLIFT','ROUTE',620,392,0); postSign('warning','FORKLIFT','ROUTE',1260,392,0); wallSign('mandatory','PPE','REQUIRED',300,600,2.2,-Math.PI/2);
+  // lamp posts
+  const lampM=std('#5c6166',{r:.4,m:.8}); for(let x=420;x<1540;x+=320){ scene.add(cyl(.06,.09,6,lampM,X(x),3,Z(352),10)); scene.add(bx(.8,.08,.25,lampM,X(x)+.35,6,Z(352),false)); }
+  // trees (palms + shade trees)
+  const trunkM=std('#6d5a43',{r:1}), frondM=std('#3e6b2a',{r:.85,side:THREE.DoubleSide}), leafM=std('#3c6a2c',{r:.9});
+  const palm=(x,z,h=7)=>{ const g=new THREE.Group(); const tr=cyl(.16,.24,h,trunkM,0,h/2,0,10); tr.rotation.z=rnd(-.08,.08); g.add(tr);
+    for(let i=0;i<10;i++){ const fr=new THREE.Mesh(new THREE.PlaneGeometry(.7,3.2,1,4),frondM); const pos=fr.geometry.attributes.position; for(let k=0;k<pos.count;k++){ const yy=pos.getY(k); pos.setZ(k,-Math.pow((yy+1.6)/3.2,2)*1.3);} fr.geometry.computeVertexNormals();
+      fr.position.set(0,h,0); fr.rotation.set(-1.0,i/10*Math.PI*2,0,'YXZ'); fr.translateY(1.4); fr.castShadow=true; g.add(fr); }
+    consolidate(g); g.position.set(x,0,z); scene.add(g); };
+  const shade=(x,z)=>{ const g=new THREE.Group(); g.add(cyl(.18,.26,2.4,trunkM,0,1.2,0,8)); for(let i=0;i<5;i++){ const c=mesh(new THREE.IcosahedronGeometry(rnd(1.1,1.6),1),leafM,rnd(-.8,.8),rnd(2.6,3.6),rnd(-.8,.8)); g.add(c);} consolidate(g); g.position.set(x,0,z); scene.add(g); };
+  for(let x=300;x<FENCE.r;x+=170) palm(X(x),Z(H-45),rnd(6,8));
+  for(let y=760;y<880;y+=55) shade(X(1490),Z(y)); palm(X(1500),Z(1150),7); palm(X(270),Z(470),6.5);
+  // across-the-street buildings & poles
+  for(let i=0;i<9;i++){ const w=rnd(10,16), h=rnd(4,10); const m=std(['#e8d9b8','#d7e3e8','#f0e0d0','#d9c9a8'][i%4],{r:.92}); m.map=tex(TX.plaster,w/4,h/4); scene.add(bx(w,h,10,m,-8+i*18,h/2,Z(H)+16)); }
+  const poleM=std('#6a5a48',{r:1}); const wire=new THREE.LineBasicMaterial({color:0x111111});
+  const polePts=[]; for(let x=-10;x<W*K+20;x+=22){ scene.add(cyl(.12,.15,9,poleM,x,4.5,Z(H)+3.5,8)); scene.add(bx(1.6,.1,.1,poleM,x,8.5,Z(H)+3.5,false)); polePts.push(x); }
+  for(const off of [-.7,0,.7]){ const pts=[]; polePts.forEach((x,i)=>{ pts.push(new THREE.Vector3(x,8.6,Z(H)+3.5+off)); if(i<polePts.length-1) pts.push(new THREE.Vector3(x+11,7.9,Z(H)+3.5+off)); }); scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),wire)); }
+  const danfo=makeDanfo(); danfo.position.set(X(700),0,Z(H)-2); danfo.rotation.y=Math.PI/2; scene.add(danfo);
+  const ok=makeOkada(); ok.position.set(X(260),0,Z(FENCE.b)+3.2); ok.rotation.y=Math.PI/2.4; scene.add(ok);
+  const rider=makeHuman({sex:'m',skin:'#3b2416',top:'#6b2d2d',bottom:'#222',longSleeve:true}); rider.position.set(X(260),.35,Z(FENCE.b)+3.2); rider.rotation.y=Math.PI/2.4+Math.PI/2; animHuman(rider,0,false,0,true); scene.add(rider);
+  // water tanks on stand (GeePee)
+  const stand=std('#4a4f55',{r:.5,m:.7}); for(const [x,y] of [[580,90],[1185,560]]){ for(const [a,b2] of [[-1,-1],[1,-1],[-1,1],[1,1]]) scene.add(bx(.12,4,.12,stand,X(x)+a*.9,2,Z(y)+b2*.9)); scene.add(bx(2.1,.12,2.1,stand,X(x),4,Z(y))); scene.add(cyl(.95,.95,1.8,std('#151515',{r:.6}),X(x),4.95,Z(y),20)); }
+  // diesel tanks + bund
+  const bund=std('#a9a59c',{r:.9,map:tex(TX.concrete,4,1)}); scene.add(bx(X(140),.7,.25,bund,X(1470),.35,Z(80)), bx(X(140),.7,.25,bund,X(1470),.35,Z(300)), bx(.25,.7,Z(220),bund,X(1400),.35,Z(190)), bx(.25,.7,Z(220),bund,X(1540),.35,Z(190)));
+  TANKS.forEach(t=>{ const tm=std('#e4e4e2',{r:.35,m:.5}); scene.add(cyl(X(t.r),X(t.r),5,tm,X(t.x),2.5,Z(t.y),28)); scene.add(cyl(X(t.r)*1.02,X(t.r)*1.02,.25,std('#c8102e',{r:.4}),X(t.x),4.2,Z(t.y),28)); const lad=bx(.4,5,.05,stand,X(t.x)+X(t.r),2.5,Z(t.y)); scene.add(lad); });
+  // generator canopy (soundproof) beside gen house + exhaust
+  scene.add(bx(3.4,2,1.4,std('#2f5d3a',{r:.5,m:.4}),X(1310),1,Z(720))); scene.add(cyl(.08,.08,2.5,std('#555',{m:.8,r:.4}),X(1310)+1.2,3.2,Z(720),8));
+  // truck at bay
+  const truck=new THREE.Group(); const cont=std('#2d5e8c',{r:.5,m:.4}); cont.map=tex(TX.corr,6,1); cont.normalMap=tex(TX.corrN,6,1,false);
+  truck.add(bx(X(TRUCK.w-55),2.9,Z(TRUCK.h),cont,0,2.05,0)); truck.add(bx(X(TRUCK.w-55),.3,Z(TRUCK.h),std('#222',{r:.6,m:.5}),0,.55,0));
+  const cab=makeCar('#d8d8d8',2.2,Z(TRUCK.h),2.8,true); cab.rotation.y=-Math.PI/2; cab.position.set(X(TRUCK.w-55)/2+1.4,.1,0); truck.add(cab);
+  const tm2={tire:std('#151515',{r:.8}),rim:std('#999',{r:.3,m:.9})}; for(const x of [-3.5,-2.6]) for(const z of [-1,1]){ const w=wheel(.48,.3,0,0,0,tm2); w.rotation.y=Math.PI/2; w.position.set(x,.48,z*Z(TRUCK.h)*.42); truck.add(w); }
+  truck.position.set(X(TRUCK.x)+X(TRUCK.w-55)/2,0,Z(TRUCK.y)+Z(TRUCK.h)/2); scene.add(truck);
+  // parked cars
+  const carCols=['#b31b1b','#e9e9e9','#1f2a44']; PARKED.forEach((c,i)=>{ const car=makeCar(carCols[i],Z(c.h)*1.2,X(c.w)*.6,1.45); car.rotation.y=Math.PI/2; car.position.set(X(c.x+c.w/2),0,Z(c.y+c.h/2)); scene.add(car); });
+  // pallets, drums, cones
+  const palM=std('#9b7448',{r:.95}); for(let i=0;i<4;i++) scene.add(bx(1.2,.14,1,palM,X(600)+i*1.4,.07,Z(805)+1));
+  for(let i=0;i<5;i++) scene.add(cyl(.29,.29,.88,std(i%2?'#1f4f9a':'#2b2b2b',{r:.45,m:.3}),X(1180)+i*.65,.44,Z(300)+.3,18));
+  const coneM=std('#ff6a00',{r:.5}); for(const [x,y] of [[640,392],[700,392],[1180,392],[1240,392]]) scene.add(cyl(.02,.17,.6,coneM,X(x),.3,Z(y),12));
+  { const rack=makeProp('🧤'); rack.position.set(X(262),0,Z(705)); rack.rotation.y=Math.PI/2; scene.add(rack); }
+  // forklift, van
+  const fork=makeForklift(); scene.add(fork);
+  const van=makeCar('#f4f4f4',4.8,1.9,2.2,true); scene.add(van);
+  const beepS=labelSprite('◀ BEEP · REVERSING',.32); beepS.material.color=new THREE.Color('#ff8080'); beepS.position.y=2.9; van.add(beepS);
+  // NPCs
+  const npcs=NPCS.map(n=>{ const g=makeHuman(n.look); g.position.set(X(n.x),0,Z(n.y)); scene.add(g); if(n.smoke){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:SMOKE_TEX(),transparent:true,opacity:.5,depthWrite:false})); s.scale.set(.4,.4,1); s.position.set(.25,1.75,-.25); g.add(s); g.userData.smoke=s; } return {g,n}; });
+  // player
+  let player=makeHuman(playerLook()); scene.add(player);
+  // rain (streaks)
+  const RN=2400, rp=new Float32Array(RN*6);
+  for(let i=0;i<RN;i++){ const x=(Math.random()-.5)*70, y=Math.random()*28, z=(Math.random()-.5)*70; rp.set([x,y,z,x+.05,y-.6,z],i*6); }
+  const rgeo=new THREE.BufferGeometry(); rgeo.setAttribute('position',new THREE.BufferAttribute(rp,3));
+  const rain=new THREE.LineSegments(rgeo,new THREE.LineBasicMaterial({color:lin('#b8c8dc'),transparent:true,opacity:.45})); rain.visible=false; scene.add(rain);
+  const puddles=new THREE.Group(); [[1085,520,6,1.4],[700,1010,4.5,1],[300,800,3,1],[520,440,5,1.2]].forEach(([x,y,a,b2])=>{ const m=new THREE.Mesh(new THREE.CircleGeometry(1,28),std('#20262c',{r:.02,m:.3,transparent:true,opacity:.85})); m.rotation.x=-Math.PI/2; m.scale.set(a,b2,1); m.position.set(X(x),.016,Z(y)); puddles.add(m); }); puddles.visible=false; scene.add(puddles);
+  // smoke & fire
+  const smokeT=SMOKE_TEX(); const smoke=[]; for(let i=0;i<46;i++){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:smokeT,transparent:true,depthWrite:false,opacity:.85,color:lin('#555')})); s.userData={a:Math.random()*Math.PI*2,r:Math.sqrt(Math.random()),h:Math.random()}; s.visible=false; scene.add(s); smoke.push(s); }
+  const fireT=tex(mkCanvas(128,128,(c)=>{ const g=c.createRadialGradient(64,80,4,64,70,60); g.addColorStop(0,'rgba(255,240,180,1)'); g.addColorStop(.35,'rgba(255,150,30,.9)'); g.addColorStop(1,'rgba(200,40,0,0)'); c.fillStyle=g; c.fillRect(0,0,128,128); }),1,1);
+  const flames=[]; for(let i=0;i<10;i++){ const f=new THREE.Sprite(new THREE.SpriteMaterial({map:fireT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false})); f.visible=false; f.userData={o:rnd(-1.6,1.6),p:Math.random()*6}; scene.add(f); flames.push(f); }
+  // alarm beacons on buildings
+  const beacons=[]; for(const b of BUILD.filter(b=>b.door)){ const m=new THREE.Mesh(new THREE.SphereGeometry(.12,10,8),new THREE.MeshBasicMaterial({color:'#3a1010'})); m.position.set(X(b.door.x),3.0,Z(b.door.y)+(b.door.y<b.y?.15:-.15)); scene.add(m); beacons.push(m); }
+
+  // guide visuals
+  const chev=new THREE.Shape([[-.35,-.25],[0,.15],[.35,-.25],[.35,-.05],[0,.35],[-.35,-.05]].map(([x,y])=>new THREE.Vector2(x,y)));
+  const chevGeo=new THREE.ShapeGeometry(chev); chevGeo.rotateX(-Math.PI/2);
+  const arrows=new THREE.InstancedMesh(chevGeo,new THREE.MeshBasicMaterial({color:'#ffd21a',transparent:true,opacity:.9,depthWrite:false,toneMapped:false}),60); arrows.frustumCulled=false; arrows.count=0; scene.add(arrows);
+  const beamT=tex(mkCanvas(16,128,(c)=>{ const g=c.createLinearGradient(0,0,0,128); g.addColorStop(0,'rgba(255,215,40,0)'); g.addColorStop(1,'rgba(255,215,40,.75)'); c.fillStyle=g; c.fillRect(0,0,16,128); }),1,1);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,14,20,1,true),new THREE.MeshBasicMaterial({map:beamT,transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,toneMapped:false})); beam.visible=false; scene.add(beam);
+  const escort=makeHuman({sex:'m',skin:'#3b2416',top:'#1f3a5f',bottom:'#1f2a3a',outfit:'coverall',longSleeve:true,vest:true,vestColor:'#ff7a00',hat:'hard',hatColor:'#1f6fd1',boots:true,goggles:false,beard:true,label:'HSE Escort · follow me'}); escort.visible=false; scene.add(escort);
+  flushInst(scene);
+  const dyn={markers:[],items:[],workers:[],bag:null};
+  G={arrows,beam,escort,renderer,scene,camera,hemi,sun,alarmLight,fireLight,barrier,fork,van,beepS,npcs,player,rain,puddles,smoke,flames,beacons,glass,yardMat,streetMat,shake:0,dyn,SKIES,setSky,skyMode:'day',envRT:initEnv,
+    resetDynamic(){
+      dyn.markers.forEach(m=>{scene.remove(m.s); scene.remove(m.ring);}); dyn.items.forEach(i=>scene.remove(i.g)); dyn.workers.forEach(w=>scene.remove(w)); if(dyn.bag) scene.remove(dyn.bag);
+      dyn.markers=[]; dyn.items=[]; dyn.workers=[]; dyn.bag=null;
+      const ringM=new THREE.MeshBasicMaterial({color:'#ffd400',transparent:true,opacity:.7,depthWrite:false});
+      for(const z of ZONES){ if(!z.r) continue; const s=labelSprite('!',.42); s.material.color=new THREE.Color('#ffe14d'); s.position.set(X(z.x),2.6,Z(z.y)); scene.add(s);
+        const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.7,32),ringM); ring.rotation.x=-Math.PI/2; ring.position.set(X(z.x),.03,Z(z.y)); scene.add(ring); dyn.markers.push({z,s,ring}); }
+      for(const it of S.items){ const g=makeProp(it.e); g.position.set(X(it.x),0,Z(it.y)); g.rotation.y=rnd(0,Math.PI*2); scene.add(g);
+        const glint=labelSprite('?',.3); glint.material.color=new THREE.Color('#ffffff'); glint.position.y=2.1; g.add(glint);
+        const tag=labelSprite('DANGER · DO NOT USE',.26); tag.material.color=new THREE.Color('#ff7070'); tag.position.y=1.85; tag.visible=false; g.add(tag);
+        dyn.items.push({it,g,glint,tag}); }
+      scene.remove(G.player); G.player=makeHuman(playerLook()); scene.add(G.player);
+    },
+    spawnWorkers(){ const looks=[{sex:'m',skin:'#3d2416',top:'#24508a',bottom:'#24508a'},{sex:'f',skin:'#5a3825',top:'#24508a',bottom:'#24508a'},{sex:'m',skin:'#6b4226',top:'#3a3a3a',bottom:'#3a3a3a'},{sex:'f',skin:'#3b2416',top:'#2f6f4f',bottom:'#222'}];
+      S.workers.forEach((w,i)=>{ const g=makeHuman({...looks[i%4],outfit:'coverall',vest:true,hat:'hard',hatColor:['#f6f6f2','#f1c40f','#1f6fd1'][i%3],longSleeve:true,boots:true,goggles:i%2===0,hair:looks[i%4].sex==='f'?'bun':'low'}); g.position.set(X(w.x),0,Z(w.y)); scene.add(g); dyn.workers.push(g); });
+      const b=new THREE.Group(); b.add(bx(.4,.3,.18,std('#3b2b20',{r:.6}),0,.15,0)); b.add(bx(.3,.04,.04,std('#222'),0,.32,0)); b.position.set(X(430),0,Z(320)); scene.add(b); dyn.bag=b; },
+  };
+  addEventListener('resize',resize3D); resize3D();
+}
+let BLOB=null, _smokeTex=null;
+function SMOKE_TEX(){ if(!_smokeTex) _smokeTex=tex(mkCanvas(128,128,(c)=>{ for(let i=0;i<6;i++){ const x=rnd(40,88),y=rnd(40,88),r=rnd(25,45); const g=c.createRadialGradient(x,y,2,x,y,r); g.addColorStop(0,'rgba(255,255,255,.55)'); g.addColorStop(1,'rgba(255,255,255,0)'); c.fillStyle=g; c.fillRect(0,0,128,128);} }),1,1); return _smokeTex; }
+function playerLook(){ return {sex:profile.sex, skin:profile.skin, top:profile.shirt, bottom:profile.sex==='f'?'#2b2b36':'#2a2f3a', hair:profile.sex==='f'?'braids':'low', vest:false, hat:null, longSleeve:false, collar:true, boots:false}; }
+function resize3D(){ if(!G) return; G.renderer.setSize(innerWidth,innerHeight,false); G.camera.aspect=innerWidth/innerHeight; G.camera.fov = innerWidth<innerHeight? 68 : 58; G.camera.updateProjectionMatrix(); }
+
+function applyWeather(){
+  const mode = S.nepa>0 ? 'nepa' : S.rain>0 ? 'rain' : 'day';
+  if(mode!==G.skyMode){ G.skyMode=mode; G.setSky(G.SKIES[mode]); }
+}
+function render3D(dt){
+  const {scene,camera} = G; const player=G.player; const t=S.t, p=S.p;
+  applyWeather();
+  const sk=G.SKIES[G.skyMode];
+  G.renderer.toneMappingExposure += ((S.alarm? .65 : sk.exp) - G.renderer.toneMappingExposure)*Math.min(1,dt*1.5);
+  scene.fog.color.lerp(lin(S.alarm?'#6b5a55':sk.fog),Math.min(1,dt*2));
+  G.sun.intensity += ((G.skyMode==='day'?2.4:G.skyMode==='rain'?.6:.25) - G.sun.intensity)*Math.min(1,dt*2);
+  G.glass.emissiveIntensity = G.skyMode==='nepa' ? 0 : .06;
+  const wet = G.skyMode==='rain'; G.yardMat.roughness += ((wet?.25:.85)-G.yardMat.roughness)*Math.min(1,dt); G.streetMat.roughness = G.yardMat.roughness+.05;
+  // sun follows player for crisp shadows
+  const P=new THREE.Vector3(X(p.x),0,Z(p.y));
+  G.sun.position.set(P.x+18,40,P.z+12); G.sun.target.position.copy(P);
+  // player
+  player.position.copy(P); player.rotation.y=p.face; animHuman(player,p.step,p.moving&&!paused,t);
+  setPPE(player,p.ppe);
+  player.visible=!firstPerson;
+  // camera
+  if(firstPerson){
+    const bob = p.moving&&!paused ? Math.sin(p.step*2)*.03 : 0;
+    camera.position.set(P.x,1.62+bob,P.z); camera.rotation.set(-(pitch-0.25),yaw,0);
+  } else {
+    const d=5.2, el=0.12+pitch; let tt=1; const sol=solids();
+    for(; tt>0.25; tt-=0.06){ const cx2=p.x+Math.sin(yaw)*d*Math.cos(el)/K*tt, cy2=p.y+Math.cos(yaw)*d*Math.cos(el)/K*tt; if(!blocked(cx2,cy2,8,sol)) break; }
+    camera.position.set(P.x+Math.sin(yaw)*d*Math.cos(el)*tt, 1.55+d*Math.sin(el)*tt, P.z+Math.cos(yaw)*d*Math.cos(el)*tt);
+    camera.lookAt(P.x-Math.sin(yaw)*1.2,1.45,P.z-Math.cos(yaw)*1.2);
+  }
+  if(G.shake>0){ G.shake-=dt; camera.position.x+=(Math.random()-.5)*.25; camera.position.y+=(Math.random()-.5)*.25; }
+  // rain
+  G.rain.visible=wet; G.puddles.visible=wet;
+  if(wet){ const a=G.rain.geometry.attributes.position; for(let i=0;i<a.count;i+=2){ let y=a.getY(i)-dt*24; if(y<0) y+=28; a.setY(i,y); a.setY(i+1,y-.6);} a.needsUpdate=true; G.rain.position.set(P.x,0,P.z); }
+  // gate barrier
+  const targ = S.gateOpen? Math.PI/2.2 : 0; G.barrier.rotation.z += (targ-G.barrier.rotation.z)*Math.min(1,dt*3);
+  // forklift
+  const f=S.forklift; G.fork.position.set(X(f.x),0,Z(440)); G.fork.rotation.y = f.dir>0?0:Math.PI;
+  G.fork.userData.beacon.material.color.set(f.stop?'#22ff66':(Math.floor(t*4)%2?'#ffaa00':'#552200'));
+  // van
+  const v=S.van; G.van.position.set(X(1360),0,Z(v.y-35)); G.van.rotation.y=Math.PI;
+  const rev = v.dir<0 && v.wait<=0; G.beepS.visible=rev && Math.floor(t*2)%2===0; G.van.userData.tail.emissiveIntensity = rev? 2 : .3;
+  // NPCs
+  G.npcs.forEach(({g,n})=>{ const dd=dist(p.x,p.y,n.x,n.y); if(dd<260){ const tgt=Math.atan2(-(p.x-n.x),-(p.y-n.y)); g.rotation.y+=((((tgt-g.rotation.y)+Math.PI*3)%(Math.PI*2))-Math.PI)*Math.min(1,dt*3);} animHuman(g,0,false,t+n.x);
+    if(g.userData.label) g.userData.label.visible = dd<220; if(g.userData.smoke){ g.userData.smoke.visible=!('diesel' in S.results); const k=(t*.5)%1; g.userData.smoke.position.y=1.75+k*.7; g.userData.smoke.material.opacity=.5*(1-k); } });
+  // markers & items
+  G.dyn.markers.forEach(({z,s,ring})=>{ const on=!(z.id in S.results); s.visible=on; ring.visible=on; s.position.y=2.6+Math.sin(t*3)*.12; ring.material.opacity=.45+Math.sin(t*4)*.25; });
+  G.dyn.items.forEach(({it,g,glint,tag})=>{ tag.visible=it.done==='tag'; const dd=dist(p.x,p.y,it.x,it.y); glint.visible=!it.done && dd<320; glint.material.opacity = .5+.5*Math.sin(t*5); if(g.userData.spin) g.userData.spin.rotation.y+=dt*30; });
+  // alarm & fire
+  const al=!!S.alarm && !S.over;
+  G.alarmLight.intensity = al ? (Math.sin(t*8)>0?3:0.3) : 0; G.beacons.forEach(b=>b.material.color.set(al&&Math.sin(t*8)>0?'#ff2020':'#3a1010'));
+  G.fireLight.intensity = al ? 6+Math.random()*4 : 0;
+  G.flames.forEach(fl=>{ fl.visible=al; if(al){ const u=fl.userData, k=((t*1.4+u.p)%1); fl.position.set(X(1030)+u.o, .4+k*2.6, Z(292)); const sz=(1.4-k)*1.6; fl.scale.set(sz,sz*1.4,1); fl.material.opacity=1-k; } });
+  G.smoke.forEach(s=>{ s.visible=al; if(al){ const u=s.userData; const plume=u.r<0.35;
+    if(plume){ const rise=((t*.22+u.h)%1); s.position.set(X(1030+Math.cos(u.a)*50)+rise*4, 6+rise*16, Z(180+Math.sin(u.a)*50)); const sz=5+rise*10; s.scale.set(sz,sz,1); s.material.opacity=.85*(1-rise*.7); }
+    else { const r=u.r*S.smokeR; s.position.set(X(1030+Math.cos(u.a)*r), 1+u.h*3+Math.sin(t+u.a)*.3, Z(300+Math.abs(Math.sin(u.a))*r)); const sz=3+S.smokeR*K*.25; s.scale.set(sz,sz,1); } } });
+  G.dyn.workers.forEach((g,i)=>{ const w=S.workers[i]; if(!w) return; g.position.set(X(w.x),0,Z(w.y)); if(w.face!==undefined) g.rotation.y=w.face; animHuman(g,w.step,dist(w.x,w.y,MUSTER.x,MUSTER.y)>30,t); });
+  if(G.dyn.bag) G.dyn.bag.visible = al && !S.bagDone;
+  // guide visuals
+  const gd=S.guide, gOn=guideOn && gd && gd.path && gd.target && !S.over;
+  if(gOn){ const pth=gd.path; let n=0, acc=0, nextAt=40; const m4=new THREE.Matrix4(), q=new THREE.Quaternion(), sc=new THREE.Vector3(), ps=new THREE.Vector3(), up=new THREE.Vector3(0,1,0);
+    for(let i=1;i<pth.length && n<60;i++){ const [x0,y0]=pth[i-1],[x1,y1]=pth[i]; const L=dist(x0,y0,x1,y1); while(acc+L>=nextAt && n<60){ const f=(nextAt-acc)/L; const x=x0+(x1-x0)*f, y=y0+(y1-y0)*f; const a=Math.atan2(-(x1-x0),-(y1-y0));
+        const pulse=.75+.35*Math.max(0,Math.sin(t*6-n*.5)); q.setFromAxisAngle(up,a); ps.set(X(x),.04,Z(y)); sc.set(pulse,1,pulse); m4.compose(ps,q,sc); G.arrows.setMatrixAt(n++,m4); nextAt+=36; } acc+=L; }
+    G.arrows.count=n; G.arrows.instanceMatrix.needsUpdate=true; G.beam.visible=false;
+  } else { G.arrows.count=0; G.beam.visible=false; }
+  G.escort.visible=!!(guideOn && gd && gd.esc && started);
+  if(G.escort.visible){ const e=gd.esc; G.escort.position.set(X(e.x),0,Z(e.y)); G.escort.rotation.y=e.face; animHuman(G.escort,e.step,e.moving,t); }
+  G.renderer.render(scene,camera);
+}
+function renderIntro(t){
+  const {camera}=G; const a=t*0.05; const cxp=X(W/2), czp=Z(H/2);
+  camera.position.set(cxp+Math.sin(a)*52, 24, czp+Math.cos(a)*44); camera.lookAt(cxp,0,czp);
+  G.sun.position.set(cxp+30,60,czp+20); G.sun.target.position.set(cxp,0,czp);
+  G.player.visible=false; G.npcs.forEach(({g},i)=>animHuman(g,0,false,t+i));
+  G.renderer.render(G.scene,camera);
+}
+
+function drawHUD(){
+  $('bars').innerHTML = BARS.map(b=>{const v=S.bars[b.k]; return `<div class="b ${v<5?'low':''}" title="${b.l}">${b.n} ${Math.ceil(v)}<div class="t"><div class="f" style="width:${v*10}%"></div></div></div>`}).join('');
+  const mins = 8*60 + Math.floor(S.t); const hh=String(Math.floor(mins/60)%24).padStart(2,'0'), mm=String(mins%60).padStart(2,'0');
+  $('info').innerHTML = `<span>🕗 ${hh}:${mm}</span><span>✅ ${Object.keys(S.results).length}/${ZONES.length}</span><span>🔎 ${S.hazFound}/${S.hazTotal}</span>${PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join('')?'<span>PPE: '+PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join(' ')+'</span>':''}`;
+  const m=$('mini'), c=m.getContext('2d'), sx=m.width/W, sy=m.height/H;
+  c.fillStyle='#cfcabd'; c.fillRect(0,0,m.width,m.height);
+  c.fillStyle='#5d5e61'; c.fillRect(LANE.x1*sx,LANE.y1*sy,(LANE.x2-LANE.x1)*sx,(LANE.y2-LANE.y1)*sy); c.fillRect(80*sx,60*sy,160*sx,(FENCE.b-60)*sy);
+  BUILD.forEach(b=>{c.fillStyle=b.c; c.fillRect(b.x*sx,b.y*sy,b.w*sx,b.h*sy);});
+  c.fillStyle='#27ae60'; c.beginPath(); c.arc(MUSTER.x*sx,MUSTER.y*sy,4,0,7); c.fill();
+  ZONES.forEach(z=>{ if(!z.r||(z.id in S.results)) return; c.fillStyle='#e0b800'; c.fillRect(z.x*sx-2,z.y*sy-2,4,4); });
+  if(S.guide&&S.guide.path&&guideOn){ c.strokeStyle='#0f7a4f'; c.lineWidth=2; c.setLineDash([3,2]); c.beginPath(); S.guide.path.forEach(([x,y],i)=>i?c.lineTo(x*sx,y*sy):c.moveTo(x*sx,y*sy)); c.stroke(); c.setLineDash([]); const T=S.guide.target; if(T){ c.fillStyle='#0f7a4f'; c.beginPath(); c.arc(T.x*sx,T.y*sy,4,0,7); c.fill(); } }
+  const gp=$('guidePanel'), T=S.guide&&S.guide.target; if(guideOn&&T&&S.guide.path&&started&&!S.over&&$('prompt').classList.contains('hidden')){ gp.classList.remove('hidden'); const pth=S.guide.path, nx=pth[Math.min(3,pth.length-1)]; const dx=nx[0]-S.p.x, dy=nx[1]-S.p.y, fx=-Math.sin(yaw), fy=-Math.cos(yaw); const ang=Math.atan2(fx*dy-fy*dx, fx*dx+fy*dy); $('gArrow').style.transform=`rotate(${ang}rad)`; $('gText').textContent=`Next: ${T.name} · ${Math.max(1,Math.round(pathLen(pth)*K))} m`; } else gp.classList.add('hidden');
+  const px=S.p.x*sx, py=S.p.y*sy; c.fillStyle='#e00'; c.beginPath(); c.moveTo(px-Math.sin(yaw)*7,py-Math.cos(yaw)*7); c.lineTo(px+Math.cos(yaw)*3.5,py-Math.sin(yaw)*3.5); c.lineTo(px-Math.cos(yaw)*3.5,py+Math.sin(yaw)*3.5); c.fill();
+}
+
+// ================== LOOP ==================
+let last=performance.now(), hudT=0, started=false;
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(G && S){
+    if(!started) renderIntro(now/1000);
+    else { if(!paused && !S.over) update(dt); render3D(dt); hudT+=dt; if(hudT>0.12){hudT=0; drawHUD();} }
+  }
+  requestAnimationFrame(loop);
+}
+
+// ================== INPUT ==================
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(paused) return;
+  keys[e.code]=true;
+  if(e.code==='KeyE'||e.code==='Space'||e.code==='Enter'){ e.preventDefault(); doAct(); }
+  if(e.code==='KeyV') toggleCam();
+  if(e.code.startsWith('Arrow')) e.preventDefault();
+});
+addEventListener('keyup',e=>{keys[e.code]=false;});
+const cv=$('game');
+cv.addEventListener('pointerdown',e=>{
+  ensureAudio(); if(paused||!started) return;
+  cv.setPointerCapture(e.pointerId);
+  if(e.pointerType!=='mouse' && e.clientX < innerWidth*0.5 && !joy){
+    joy={id:e.pointerId,ox:e.clientX,oy:e.clientY,dx:0,dy:0};
+    const j=$('joy'); j.style.left=e.clientX+'px'; j.style.top=e.clientY+'px'; j.classList.remove('hidden'); j.firstElementChild.style.transform='';
+  } else if(!look) look={id:e.pointerId,x:e.clientX,y:e.clientY};
+});
+cv.addEventListener('pointermove',e=>{
+  if(joy && e.pointerId===joy.id){ let dx=e.clientX-joy.ox, dy=e.clientY-joy.oy; const l=Math.hypot(dx,dy), m=50; if(l>m){dx=dx/l*m; dy=dy/l*m;}
+    joy.dx=dx/m; joy.dy=dy/m; $('joy').firstElementChild.style.transform=`translate(${dx}px,${dy}px)`; }
+  else if(look && e.pointerId===look.id){ yaw -= (e.clientX-look.x)*0.006; pitch = clamp(pitch+(e.clientY-look.y)*0.004,-0.35,1.0); look.x=e.clientX; look.y=e.clientY; }
+});
+const endPtr=e=>{ if(joy&&e.pointerId===joy.id){ joy=null; $('joy').classList.add('hidden'); } if(look&&e.pointerId===look.id) look=null; };
+cv.addEventListener('pointerup',endPtr); cv.addEventListener('pointercancel',endPtr);
+function toggleCam(){ firstPerson=!firstPerson; toast(firstPerson?'👁️ First-person view: you are seeing through your own eyes.':'🎥 Third-person view'); }
+$('act').onclick=doAct;
+$('phoneBtn').onclick=()=>{ if(!paused) openPhone(); };
+$('camBtn').onclick=()=>{ if(!paused) toggleCam(); };
+$('guideBtn').onclick=()=>{ guideOn=!guideOn; guidePick=null; $('guideBtn').textContent='🧭 Guide: '+(guideOn?'ON':'OFF'); toast(guideOn?'🧭 Your HSE escort will lead you to the next task.':'Guide off. Explore on your own. Use 📱 Tasks if you get lost.'); };
+$('autoBtn').onclick=()=>{ autoQ=!autoQ; $('autoBtn').textContent='⚡ Auto: '+(autoQ?'ON':'OFF'); toast(autoQ?'⚡ Questions now pop up automatically when you reach a place.':'Auto off. Press the green button to talk.'); };
+$('muteBtn').onclick=()=>{ muted=!muted; $('muteBtn').textContent=muted?'🔇':'🔊'; };
+
+// ================== START ==================
+function setHud(on){ ['hud','act','phoneBtn','camBtn','autoBtn','guideBtn','muteBtn','hint'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){$('guidePanel').classList.add('hidden');$('prompt').classList.add('hidden');$('timer').classList.add('hidden');$('alarmv').classList.add('hidden');} }
+function showStart(){
+  setHud(false); started=false; profile.role=null; newGame(); paused=true;
+  const m=openModal(`<p class="muted" style="margin:0 0 6px;font-weight:700">Choose a game</p><div class="games"><span class="gcard on"><span class="gi">🏭</span><b>Factory Site Induction</b><small>Workers & visitors</small></span><a class="gcard" href="kids.html?world=home"><span class="gi">🏠🚌</span><b>Home → School Bus</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=school"><span class="gi">🏫</span><b>School Safety</b><small>Kids 6–12</small></a></div><h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
+    <p class="muted">The safety induction you <b>play</b>, not a paper you tick. Walk the compound, make the right calls, spot the hazards, and survive your first shift.<br>Demo site: <i>Acme Manufacturing, Ikeja</i>.</p>
+    <p><b>Your name</b></p><input id="nm" placeholder="e.g. Tunde Bakare" maxlength="40" value="${esc(profile.name)}">
+    <p><b>Company</b> <span class="muted">(optional)</span></p><input id="co" placeholder="e.g. ABC Contractors Ltd" maxlength="60" value="${esc(profile.company)}">
+    <p><b>Your character</b></p>
+    <div class="row" id="sex"><button data-x="m" class="${profile.sex==='m'?'primary':''}">👨🏾 Man</button><button data-x="f" class="${profile.sex==='f'?'primary':''}">👩🏾 Woman</button></div>
+    <p class="muted" style="margin:.6em 0 .3em">Shirt colour and skin tone</p>
+    <div class="row">${SHIRTS.map(c=>`<button class="sw ${c===profile.shirt?'on':''}" data-c="${c}" style="background:${c}" aria-label="shirt colour"></button>`).join('')}</div>
+    <div class="row" style="margin-top:6px">${SKINS.map(c=>`<button class="sw ${c===profile.skin?'on':''}" data-s="${c}" style="background:${c}" aria-label="skin tone"></button>`).join('')}</div>
+    <p><b>Role lottery 🎲</b> <span class="muted">Like Lagos Life's birth lottery, you don't choose.</span></p>
+    <div class="big" id="rolebox">🎲 ?</div><p class="muted" id="roletask"></p>
+    <div class="row" id="startRow"><button id="spin">Spin role</button><button class="primary" id="start" disabled>Start shift ▶</button></div>
+    <p class="muted" style="font-size:.85rem;margin-top:12px">🎮 <b>Computer:</b> WASD to walk, drag the mouse to look, E to interact, V to switch first/third person.<br>📱 <b>Phone:</b> drag the left side of the screen to walk, drag the right side to look, and tap the green button to interact.</p>`);
+  showDashButton(m.querySelector('#startRow'));
+  m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{profile.sex=b.dataset.x; m.querySelectorAll('[data-x]').forEach(x=>x.classList.toggle('primary',x===b));});
+  m.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{profile.shirt=b.dataset.c; m.querySelectorAll('[data-c]').forEach(x=>x.classList.toggle('on',x===b));});
+  m.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{profile.skin=b.dataset.s; m.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));});
+  m.querySelector('#spin').onclick=()=>{
+    ensureAudio(); m.querySelector('#spin').disabled=true; let n=0;
+    const t=setInterval(()=>{ profile.role=ROLES[Math.floor(Math.random()*ROLES.length)]; m.querySelector('#rolebox').textContent=`${profile.role.icon} ${profile.role.name}`; beep(500+n*40,.05,'square',.03);
+      if(++n>12){ clearInterval(t); m.querySelector('#roletask').textContent='📱 Task: '+profile.role.task; m.querySelector('#start').disabled=false; m.querySelector('#spin').disabled=false; chime(); } },90);
+  };
+  m.querySelector('#start').onclick=()=>{
+    profile.name=(m.querySelector('#nm').value.trim()||'Guest').slice(0,40); profile.company=m.querySelector('#co').value.trim().slice(0,60);
+    G.resetDynamic(); started=true; closeModal(); setHud(true);
+    toast('🛵 The okada has dropped you at the Main Gate. Your HSE Escort will show you round. Follow the arrows.');
+    setTimeout(()=>toast('📱 Tap "Tasks" to see what to do. Follow the yellow ! markers.'),2600);
+  };
+}
+
+window.addEventListener('load',()=>{
+  if(!window.THREE){ $('loading').innerHTML='Could not load the 3D engine. Check your internet connection, or play the <a href="lite.html">2D version</a>.'; return; }
+  try{ newGame(); initThree(); }catch(err){ $('loading').innerHTML='Your device could not start 3D. Try the <a href="lite.html">2D version</a>.'; console.error(err); return; }
+  $('loading').remove();
+  showStart();
+  requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>

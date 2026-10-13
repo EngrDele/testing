@@ -123,6 +123,8 @@ const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x
 const dist = (a,b,c,d) => Math.hypot(a-c,b-d);
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 
+// Site Life shared 3D engine (textures, materials, people, vehicles, props, mesh merging).
+// Used by the factory game (src/factory.html) and the kids games (src/kids-game.js). Built into pages by src/build.py.
 // ================== 3D (realistic) ==================
 let G = null;
 const X = x => x*K, Z = y => y*K;
@@ -534,6 +536,8 @@ function makeProp(kind){
   return propLabel(g);
 }
 
+
+// Site Life shared features for all games (consent, language, settings, offline queue). Built into pages by src/build.py.
 
 // ================== KIDS GAME (home→bus, school) ==================
 const PARAMS = new URLSearchParams(location.search);

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Kids Safety Games (offline)</title><style>
+<title>Kids Safety Games</title><style>
 :root{
   --bg:#f5f3ee; --panel:#ffffff; --ink:#1d1f22; --muted:#5d636b; --line:#ddd8cc;
   --brand:#0f7a4f; --brand-ink:#ffffff; --warn:#b26b00; --bad:#c0392b; --good:#1e8e3e; --chip:#f0ede5;
@@ -356,6 +356,8 @@ const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x
 const dist = (a,b,c,d) => Math.hypot(a-c,b-d);
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 
+// Site Life shared 3D engine (textures, materials, people, vehicles, props, mesh merging).
+// Used by the factory game (src/factory.html) and the kids games (src/kids-game.js). Built into pages by src/build.py.
 // ================== 3D (realistic) ==================
 let G = null;
 const X = x => x*K, Z = y => y*K;
@@ -767,6 +769,8 @@ function makeProp(kind){
   return propLabel(g);
 }
 
+
+// Site Life shared features for all games (consent, language, settings, offline queue). Built into pages by src/build.py.
 
 // ================== KIDS GAME (home→bus, school) ==================
 const PARAMS = new URLSearchParams(location.search);

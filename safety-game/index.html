@@ -698,6 +698,10 @@ function update(dt){
 }
 function doAct(){ if(!paused && S && S.near){ ensureAudio(); S.near.run(); } }
 
+// Site Life shared features for all games (consent, language, settings, offline queue). Built into pages by src/build.py.
+
+// Site Life shared 3D engine (textures, materials, people, vehicles, props, mesh merging).
+// Used by the factory game (src/factory.html) and the kids games (src/kids-game.js). Built into pages by src/build.py.
 // ================== 3D (realistic) ==================
 let G = null;
 const X = x => x*K, Z = y => y*K;
@@ -1108,6 +1112,7 @@ function makeProp(kind){
   }
   return propLabel(g);
 }
+
 
 // ---------- world build ----------
 function initThree(){
