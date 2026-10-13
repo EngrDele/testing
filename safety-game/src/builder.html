@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Site Builder</title>
+<style>
+:root{--bg:#f4f1ea;--panel:#fffdf8;--ink:#1d1d1b;--muted:#6b675e;--line:#ddd6c8;--brand:#0f7a4f;--bad:#c0392b;--chip:#f0ebe0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171a;--panel:#1e2125;--ink:#ecebe7;--muted:#a5a19a;--line:#33373d;--brand:#3cc68a;--bad:#ff6b5b;--chip:#272b30}}
+:root[data-theme="dark"]{--bg:#15171a;--panel:#1e2125;--ink:#ecebe7;--muted:#a5a19a;--line:#33373d;--brand:#3cc68a;--bad:#ff6b5b;--chip:#272b30}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:18px;margin:0 12px 0 0}
+button,select,input,textarea{font:inherit;color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+button{cursor:pointer}
+button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+button.danger{color:var(--bad)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;padding:12px 16px}
+@media (max-width:860px){main{grid-template-columns:1fr}}
+#wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;overflow:hidden}
+canvas{width:100%;height:auto;display:block;touch-action:none;cursor:crosshair;border-radius:8px}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+aside h2{font-size:15px;margin:12px 0 6px}
+aside label{display:block;font-size:13px;color:var(--muted);margin-top:8px}
+aside input,aside select,aside textarea{width:100%}
+textarea{min-height:70px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.muted{color:var(--muted);font-size:13px}
+.warn{color:var(--bad);font-size:13px}
+ul.list{list-style:none;margin:0;padding:0;max-height:220px;overflow:auto}
+ul.list li{padding:4px 6px;border-radius:6px;cursor:pointer;display:flex;gap:6px}
+ul.list li.on{background:var(--chip);font-weight:600}
+.opt{border:1px solid var(--line);border-radius:8px;padding:6px;margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏗️ Site Builder</h1>
+  <button id="addB">＋ Building</button><button id="addZ">＋ Zone</button><button id="addN">＋ Person</button><button id="addS">＋ Hazard spot</button>
+  <span style="flex:1"></span>
+  <button id="imp">Open JSON…</button><button id="exp">Download JSON</button><button class="primary" id="play">▶ Play test</button>
+  <input type="file" id="file" accept=".json,application/json" hidden>
+</header>
+<main>
+  <div id="wrap"><canvas id="cv" width="1600" height="1260"></canvas>
+    <p class="muted">Drag to move. Drag a building's bottom-right corner to resize. Grid squares are 1 m (20 units). The gate, forklift lane, car park, tanks and fire drill stay where they are in this version.</p></div>
+  <aside>
+    <label>Site name<input id="sname"></label>
+    <label>Sign at the gate<input id="ssign"></label>
+    <h2>Zones (in guide order)</h2>
+    <ul class="list" id="zlist"></ul>
+    <div class="row" style="margin-top:6px"><button id="up">▲</button><button id="down">▼</button></div>
+    <div id="props"></div>
+    <div id="checks"></div>
+  </aside>
+</main>
+<script>
+/*@@SITE@@*/
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SPECIAL=['gate','reception','forklift','carpark','muster','electrical'];
+const LIB=Object.keys(SITE_DEFAULT.scenarios);
+let site; try{ site=JSON.parse(localStorage.getItem('sl-site-draft')||'null'); }catch(e){}
+if(!site) site=JSON.parse(JSON.stringify(SITE_DEFAULT));
+let sel=null, drag=null;
+const cv=$('cv'), c=cv.getContext('2d');
+const save=()=>{ try{ localStorage.setItem('sl-site-draft',JSON.stringify(site)); }catch(e){} };
+
+function draw(){
+  const F=site.fence, L=site.lane;
+  c.fillStyle='#7fae5c'; c.fillRect(0,0,1600,1260);
+  c.fillStyle='#cfc7b5'; c.fillRect(F.l,F.t,F.r-F.l,F.b-F.t);
+  c.strokeStyle='rgba(0,0,0,.06)'; c.lineWidth=1; for(let x=0;x<1600;x+=20){c.beginPath();c.moveTo(x,0);c.lineTo(x,1260);c.stroke();} for(let y=0;y<1260;y+=20){c.beginPath();c.moveTo(0,y);c.lineTo(1600,y);c.stroke();}
+  c.fillStyle='#5d5e61'; c.fillRect(L.x1,L.y1,L.x2-L.x1,L.y2-L.y1); c.fillRect(80,60,160,F.b-60); c.fillRect(1020,820,380,320);
+  c.fillStyle='#fff'; site.cross.forEach(k=>{ for(let y=L.y1+6;y<L.y2-6;y+=12) c.fillRect(k.x1,y,k.x2-k.x1,6); });
+  c.strokeStyle='#555'; c.lineWidth=6; c.strokeRect(F.l,F.t,F.r-F.l,F.b-F.t); c.strokeStyle='#cfc7b5'; c.beginPath(); c.moveTo(F.gateL,F.b); c.lineTo(F.gateR,F.b); c.stroke();
+  c.fillStyle='rgba(30,140,62,.6)'; c.beginPath(); c.arc(site.muster.x,site.muster.y,site.muster.r,0,7); c.fill();
+  site.tanks.forEach(t=>{ c.fillStyle='#ddd'; c.beginPath(); c.arc(t.x,t.y,t.r,0,7); c.fill(); });
+  const T=site.truck; c.fillStyle='#2b5fa8'; c.fillRect(T.x,T.y,T.w,T.h);
+  site.parked.forEach(p=>{ c.fillStyle=p.c; c.fillRect(p.x,p.y,p.w,p.h); });
+  c.textAlign='center'; c.textBaseline='middle';
+  site.buildings.forEach(b=>{ c.fillStyle=b.c||'#ccc'; c.fillRect(b.x,b.y,b.w,b.h); c.strokeStyle=sel&&sel.o===b?'#0f7a4f':'#666'; c.lineWidth=sel&&sel.o===b?6:2; c.strokeRect(b.x,b.y,b.w,b.h);
+    c.fillStyle='#222'; c.font='bold 22px system-ui'; c.fillText(b.name,b.x+b.w/2,b.y+b.h/2); c.fillStyle='#0f7a4f'; c.fillRect(b.x+b.w-14,b.y+b.h-14,14,14);
+    if(b.door){ c.fillStyle='#7a4a24'; c.fillRect(b.door.x-14,b.door.y-6,28,12); } });
+  site.spots.forEach((s,i)=>{ c.strokeStyle=sel&&sel.o===s?'#0f7a4f':'#c0392b'; c.lineWidth=4; c.beginPath(); c.moveTo(s[0]-10,s[1]-10); c.lineTo(s[0]+10,s[1]+10); c.moveTo(s[0]+10,s[1]-10); c.lineTo(s[0]-10,s[1]+10); c.stroke(); });
+  site.npcs.forEach(n=>{ c.fillStyle=sel&&sel.o===n?'#0f7a4f':'#1f3a5f'; c.beginPath(); c.arc(n.x,n.y,12,0,7); c.fill(); c.fillStyle='#111'; c.font='16px system-ui'; c.fillText(n.label,n.x,n.y-22); });
+  site.zones.forEach((z,i)=>{ if(!z.r) return; c.strokeStyle=sel&&sel.o===z?'#0f7a4f':'#e0b800'; c.lineWidth=sel&&sel.o===z?6:4; c.beginPath(); c.arc(z.x,z.y,z.r,0,7); c.stroke();
+    c.fillStyle='#e0b800'; c.beginPath(); c.arc(z.x,z.y,14,0,7); c.fill(); c.fillStyle='#111'; c.font='bold 16px system-ui'; c.fillText(String(i+1),z.x,z.y); });
+}
+function pt(e){ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)*1600/r.width,(e.clientY-r.top)*1260/r.height]; }
+function hit(x,y){
+  for(const z of site.zones) if(z.r && Math.hypot(z.x-x,z.y-y)<20) return {k:'zone',o:z};
+  for(const n of site.npcs) if(Math.hypot(n.x-x,n.y-y)<16) return {k:'npc',o:n};
+  for(const s of site.spots) if(Math.hypot(s[0]-x,s[1]-y)<14) return {k:'spot',o:s};
+  for(const b of site.buildings.slice().reverse()){ if(x>b.x+b.w-20&&x<b.x+b.w+4&&y>b.y+b.h-20&&y<b.y+b.h+4) return {k:'bld',o:b,resize:true}; if(x>b.x&&x<b.x+b.w&&y>b.y&&y<b.y+b.h) return {k:'bld',o:b}; }
+  return null;
+}
+const snap=v=>Math.round(v/10)*10;
+cv.addEventListener('pointerdown',e=>{ const [x,y]=pt(e); const h=hit(x,y); sel=h; if(h){ drag={h,x,y}; cv.setPointerCapture(e.pointerId); } panel(); draw(); });
+cv.addEventListener('pointermove',e=>{ if(!drag) return; const [x,y]=pt(e), dx=x-drag.x, dy=y-drag.y; const {h}=drag, o=h.o;
+  if(h.k==='bld'){ if(h.resize){ o.w=Math.max(60,snap(o.w+dx)); o.h=Math.max(60,snap(o.h+dy)); } else { o.x=snap(o.x+dx); o.y=snap(o.y+dy); if(o.door){ o.door.x=snap(o.door.x+dx); o.door.y=snap(o.door.y+dy); } } }
+  else if(h.k==='spot'){ o[0]=snap(o[0]+dx); o[1]=snap(o[1]+dy); }
+  else { o.x=snap(o.x+dx); o.y=snap(o.y+dy); }
+  if(Math.abs(dx)>=5||Math.abs(dy)>=5){ drag.x=x; drag.y=y; } draw(); });
+cv.addEventListener('pointerup',()=>{ if(drag){ drag=null; save(); panel(); checks(); } });
+
+function field(label,val,on,type='input'){ const id='f'+Math.random().toString(36).slice(2); setTimeout(()=>{ const el=$(id); if(el) el.oninput=()=>{ on(el.value); save(); draw(); }; }); return type==='textarea'?`<label>${esc(label)}<textarea id="${id}">${esc(val)}</textarea></label>`:`<label>${esc(label)}<input id="${id}" value="${esc(val)}"></label>`; }
+function panel(){
+  $('zlist').innerHTML=site.zones.map((z,i)=>`<li data-i="${i}" class="${sel&&sel.o===z?'on':''}"><span>${i+1}.</span><span>${esc(z.name)}</span>${SPECIAL.includes(z.id)?'<span class="muted">(built-in)</span>':''}</li>`).join('');
+  $('zlist').querySelectorAll('li').forEach(li=>li.onclick=()=>{ const z=site.zones[+li.dataset.i]; sel={k:'zone',o:z}; panel(); draw(); });
+  const P=$('props'); if(!sel){ P.innerHTML='<p class="muted">Click something on the map to edit it.</p>'; return; }
+  const o=sel.o; let h='';
+  if(sel.k==='bld'){ h+='<h2>Building</h2>'+field('Name on the roof',o.name,v=>o.name=v)+field('Wall colour',o.c,v=>o.c=v)+field('Height (m)',o.ht,v=>o.ht=+v||4);
+    h+='<p class="muted">The door (brown) moves with the building.</p><button class="danger" id="del">Delete building</button>'; }
+  if(sel.k==='spot') h+='<h2>Hazard spot</h2><p class="muted">Each game hides 6 hazards and 4 safe items on random spots. Keep 10 or more spots.</p><button class="danger" id="del">Delete spot</button>';
+  if(sel.k==='npc'){ h+='<h2>Person</h2>'+field('Name tag',o.label,v=>{o.label=v; o.look.label=v;})+`<label>Clothes<select id="look"><option value="">Keep</option><option value="worker">Worker (coverall, hard hat)</option><option value="office">Office shirt</option><option value="security">Security</option></select></label><button class="danger" id="del">Delete person</button>`; }
+  if(sel.k==='zone'){ const builtIn=SPECIAL.includes(o.id); const sc=site.scenarios[o.sc||o.id];
+    h+=`<h2>Zone ${site.zones.indexOf(o)+1}</h2>`+field('Name',o.name,v=>o.name=v)+field('Task shown on the phone',o.hint,v=>o.hint=v)+field('Radius (units, 60 = 3 m)',o.r,v=>o.r=+v||60);
+    if(!builtIn){ h+=`<label>Question<select id="scsel"><option value="__custom">My own question</option>${LIB.map(k=>`<option value="${k}" ${(o.sc||o.id)===k?'selected':''}>${esc(SITE_DEFAULT.scenarios[k].who)}</option>`).join('')}</select></label>`;
+      if(sc && !LIB.includes(o.sc||o.id)){ h+=field('Who speaks (start with an emoji)',sc.who,v=>sc.who=v)+field('Situation',sc.text,v=>sc.text=v,'textarea');
+        sc.o.forEach((op,i)=>{ h+=`<div class="opt">${field('Answer '+(i+1),op.t,v=>op.t=v)}<label><input type="checkbox" data-ok="${i}" ${op.ok?'checked':''} style="width:auto"> Correct answer</label>${field('Why',op.why,v=>op.why=v)}</div>`; });
+        h+='<div class="row" style="margin-top:6px"><button id="addO">＋ Answer</button></div>'; }
+      h+='<p><button class="danger" id="del">Delete zone</button></p>'; }
+    else h+='<p class="muted">Built-in zone: it has special game logic, so it can be renamed and reordered but not deleted.</p>'; }
+  P.innerHTML=h;
+  const d=$('del'); if(d) d.onclick=()=>{ if(sel.k==='bld') site.buildings.splice(site.buildings.indexOf(o),1); if(sel.k==='spot') site.spots.splice(site.spots.indexOf(o),1); if(sel.k==='npc') site.npcs.splice(site.npcs.indexOf(o),1); if(sel.k==='zone') site.zones.splice(site.zones.indexOf(o),1); sel=null; save(); panel(); draw(); checks(); };
+  const lk=$('look'); if(lk) lk.onchange=()=>{ const L={worker:{outfit:'coverall',top:'#d9661f',bottom:'#d9661f',hat:'hard',hatColor:'#f5f5f5',vest:true,boots:true,longSleeve:true},office:{top:'#9fc3e6',bottom:'#2a2f3a',collar:true,longSleeve:true},security:{top:'#2b3f66',bottom:'#1f2a40',hat:'cap',hatColor:'#1b2538',collar:true,boots:true,longSleeve:true}}[lk.value]; if(L){ o.look={sex:'m',skin:'#4a2e1e',...L,label:o.label}; save(); } };
+  const ss=$('scsel'); if(ss) ss.onchange=()=>{ if(ss.value==='__custom'){ const k='custom_'+o.id; site.scenarios[k]=site.scenarios[k]||{who:'👷🏾 Worker',text:'Describe the situation here.',o:[{t:'The unsafe choice',ok:false,why:'Why it is unsafe.'},{t:'The safe choice',ok:true,why:'Correct. Why it is right.'}]}; o.sc=k; } else o.sc=ss.value; save(); panel(); };
+  P.querySelectorAll('[data-ok]').forEach(cb=>cb.onchange=()=>{ site.scenarios[o.sc].o[+cb.dataset.ok].ok=cb.checked; save(); checks(); });
+  const ao=$('addO'); if(ao) ao.onclick=()=>{ site.scenarios[o.sc].o.push({t:'Another answer',ok:false,why:''}); save(); panel(); };
+}
+function checks(){
+  const w=[]; const inB=(x,y)=>site.buildings.find(b=>x>b.x+6&&x<b.x+b.w-6&&y>b.y+6&&y<b.y+b.h-6);
+  site.zones.forEach(z=>{ if(z.r && inB(z.x,z.y)) w.push(`Zone "${z.name}" is inside a building. Move it to the door.`); const sc=site.scenarios[z.sc||z.id]; if(z.r && !SPECIAL.includes(z.id) && (!sc || sc.o.filter(o=>o.ok).length!==1)) w.push(`Zone "${z.name}" needs exactly one correct answer.`); });
+  site.npcs.forEach(n=>{ if(inB(n.x,n.y)) w.push(`"${n.label}" is standing inside a building.`); });
+  site.spots.forEach((s,i)=>{ if(inB(s[0],s[1])) w.push(`Hazard spot ${i+1} is inside a building.`); });
+  if(site.spots.length<10) w.push('Add at least 10 hazard spots (6 hazards and 4 safe items are placed on them).');
+  if(Math.hypot(site.zones[0]?.x-160,site.zones[0]?.y-1242)<60) w.push('The first zone is too close to the start point.');
+  $('checks').innerHTML=w.length?'<h2>Check before playing</h2>'+w.map(x=>`<p class="warn">⚠️ ${esc(x)}</p>`).join(''):'<p class="muted">✅ No problems found.</p>';
+  return w;
+}
+$('up').onclick=()=>{ if(!sel||sel.k!=='zone') return; const i=site.zones.indexOf(sel.o); if(i>0){ site.zones.splice(i,1); site.zones.splice(i-1,0,sel.o); save(); panel(); draw(); } };
+$('down').onclick=()=>{ if(!sel||sel.k!=='zone') return; const i=site.zones.indexOf(sel.o); if(i<site.zones.length-1){ site.zones.splice(i,1); site.zones.splice(i+1,0,sel.o); save(); panel(); draw(); } };
+let n=1; const uid=p=>{ while(site.zones.some(z=>z.id===p+n)||site.buildings.some(b=>b.id===p+n)) n++; return p+n; };
+$('addB').onclick=()=>{ const b={id:uid('b'),name:'NEW BLOCK',x:700,y:960,w:200,h:120,c:'#d9d3c7',ht:5,door:{x:800,y:944}}; site.buildings.push(b); sel={k:'bld',o:b}; save(); panel(); draw(); checks(); };
+$('addZ').onclick=()=>{ const id=uid('z'), k='custom_'+id; site.scenarios[k]={who:'👷🏾 Worker',text:'Describe the situation here.',o:[{t:'The unsafe choice',ok:false,why:'Why it is unsafe.'},{t:'The safe choice',ok:true,why:'Correct. Why it is right.'}]};
+  const z={id,name:'New zone',x:800,y:1000,r:60,hint:'Visit the new zone',sc:k}; const mi=site.zones.findIndex(z=>z.id==='muster'); site.zones.splice(mi<0?site.zones.length:mi,0,z); sel={k:'zone',o:z}; save(); panel(); draw(); checks(); };
+$('addN').onclick=()=>{ const o={x:820,y:1000,label:'Worker',look:{sex:'m',skin:'#4a2e1e',outfit:'coverall',top:'#d9661f',bottom:'#d9661f',hat:'hard',hatColor:'#f5f5f5',vest:true,boots:true,longSleeve:true,label:'Worker'}}; site.npcs.push(o); sel={k:'npc',o}; save(); panel(); draw(); };
+$('addS').onclick=()=>{ const s=[760,1000]; site.spots.push(s); sel={k:'spot',o:s}; save(); panel(); draw(); checks(); };
+$('sname').value=site.name||''; $('ssign').value=site.sign||'';
+$('sname').oninput=e=>{ site.name=e.target.value; save(); }; $('ssign').oninput=e=>{ site.sign=e.target.value; save(); };
+const finalSite=()=>{ site.route=site.zones.map(z=>z.id); return site; };
+$('exp').onclick=()=>{ const blob=new Blob([JSON.stringify(finalSite(),null,1)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(site.name||'site').toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.json'; a.click(); };
+$('imp').onclick=()=>$('file').click();
+$('file').onchange=async()=>{ const f=$('file').files[0]; if(!f) return; try{ const s=JSON.parse(await f.text()); if(!s.buildings||!s.zones) throw 0; site={...JSON.parse(JSON.stringify(SITE_DEFAULT)),...s}; sel=null; save(); $('sname').value=site.name||''; $('ssign').value=site.sign||''; panel(); draw(); checks(); }catch(e){ alert('That file is not a Site Life site file.'); } };
+$('play').onclick=()=>{ finalSite(); save(); const w=checks(); if(w.length && !confirm('There are '+w.length+' problems. Play anyway?')) return; location.href='index.html?site=local'; };
+panel(); draw(); checks();
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@ let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromiu
 const ROOT = path.resolve(__dirname, '..');
 const VENDOR = path.join(__dirname, 'vendor');
 const BASE = process.env.BASE_URL || 'file://' + ROOT + '/';
-const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'advanced', 'oga', 'home', 'school', 'market', 'water', 'online'];
+const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'advanced', 'oga', 'builder', 'home', 'school', 'market', 'water', 'online'];
 const LANG = process.env.GAME_LANG || '';               // e.g. GAME_LANG=pcm to play in Pidgin
 const withLang = (u) => LANG ? u + (u.includes('?') ? '&' : '?') + 'lang=' + LANG : u;
 const MISSES = new Set();                               // untranslated on-screen strings (written to tests/out/)
@@ -84,6 +84,24 @@ async function oga(browser) {
   await p.close();
 }
 
+// Site builder: add a zone with its own question, press Play test, and check the factory loads the draft.
+async function builder(browser) {
+  const p = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  p.errs = []; p.on('pageerror', e => p.errs.push(e.message));
+  await p.goto(BASE + 'builder.html'); await p.evaluate(() => localStorage.removeItem('sl-site-draft')); await p.reload();
+  await p.click('#addZ'); await p.fill('#sname', 'Test Site Ltd');
+  const before = await p.evaluate(() => site.zones.length);
+  p.once('dialog', d => d.accept());
+  const three = path.join(VENDOR, 'three.min.js'), sky = path.join(VENDOR, 'Sky.js');
+  if (fs.existsSync(three)) { await p.route('**/three.min.js', r => r.fulfill({ body: fs.readFileSync(three), contentType: 'application/javascript' })); await p.route('**/Sky.js', r => r.fulfill({ body: fs.readFileSync(sky), contentType: 'application/javascript' })); }
+  await p.click('#play'); await p.waitForTimeout(4000);
+  const st = await p.evaluate(() => ({ custom: !!SITE._custom, name: SITE.name, zones: ZONES.length, q: !!zoneScenario(ZONES[ZONES.length - 2].id) }));
+  console.log('builder', JSON.stringify(st), before);
+  if (!st.custom || st.name !== 'Test Site Ltd' || st.zones !== before || !st.q) fail('builder draft did not load in the game');
+  if (p.errs.length) fail('builder errors: ' + p.errs.join(' | '));
+  await p.close();
+}
+
 async function kids(browser, world) {
   const p = await page(browser, BASE + 'kids.html?world=' + world);
   await p.fill('#nm', 'Ada'); await p.check('#slConsent'); await p.click('#start'); await p.waitForTimeout(300);
@@ -123,6 +141,7 @@ async function kids(browser, world) {
     if (want.includes('factory')) await factory(browser);
     if (want.includes('advanced')) await factory(browser, '?course=advanced');
     if (want.includes('oga')) await oga(browser);
+    if (want.includes('builder')) await builder(browser);
     for (const w of ['home', 'school']) if (want.includes(w)) await kids(browser, w);
   } catch (e) { fail(e.stack || e.message); }
   await browser.close();

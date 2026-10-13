@@ -43,7 +43,8 @@ def kids_page():
 
 idx, kids = factory_page(), kids_page()
 wr('index.html', idx); wr('kids.html', kids)
-print('built index.html, kids.html')
+wr('builder.html', rd('builder.html').replace('/*@@SITE@@*/', site_js))
+print('built index.html, kids.html, builder.html')
 
 if len(sys.argv) >= 3:
     three = open(sys.argv[1], encoding='utf8').read().replace('</script', '<\\/script')
