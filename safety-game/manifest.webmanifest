@@ -1,0 +1,24 @@
+{
+  "name": "Site Life",
+  "short_name": "Site Life",
+  "description": "3D safety training games: factory site induction and kids safety games.",
+  "id": "./",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#121c22",
+  "theme_color": "#0f7a4f",
+  "lang": "en",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Factory induction", "url": "index.html" },
+    { "name": "Kids: Home to School Bus", "url": "kids.html?world=home" },
+    { "name": "Kids: School Safety", "url": "kids.html?world=school" }
+  ]
+}

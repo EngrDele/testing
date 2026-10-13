@@ -3,7 +3,8 @@
 // SL.t        translation with English fallback; SL.lang current language
 // SL.settings graphics quality, text size, captions, colour-blind palette
 // SL.caption  on-screen captions for spoken text
-// SL.post     send a result to our server / Google Sheets with an offline queue
+// SL.post     send a result to our server / Google Sheets with an offline queue (IndexedDB); SL.lastId, SL.certLink(id)
+// SL.lms      SCORM 1.2 reporting when the game runs inside an LMS frame
 const SL = (() => {
   const QS = new URLSearchParams(location.search);
   const store = {
@@ -174,52 +175,196 @@ const SL = (() => {
     const b = btns[+e.code.slice(5) - 1]; if (b) { e.preventDefault(); b.click(); }
   }, true);
 
+  // ---------- LMS (SCORM 1.2) ----------
+  // When a game runs inside an LMS (TalentLMS, Moodle, ...) the LMS puts a SCORM 1.2 `API` object on a
+  // parent (or opener) window. We initialise on load, pre-fill the learner's name, and report the
+  // result from SL.post(): score (0-100) and passed/failed. A pass finishes the attempt at once;
+  // a fail is committed (so the learner can replay in the same attempt) and finished when the page closes.
+  const lms = (() => {
+    let api = null, state = 'none', t0 = Date.now(); // state: none | open | finished
+    function find(w) {
+      for (let i = 0; w && i < 10; i++) {
+        try { if (w.API && typeof w.API.LMSInitialize === 'function') return w.API; } catch (e) {} // cross-origin parent
+        try { if (!w.parent || w.parent === w) break; w = w.parent; } catch (e) { break; }
+      }
+      return null;
+    }
+    try { if (window.parent !== window) api = find(window.parent); } catch (e) {}
+    if (!api) try { if (window.opener) api = find(window.opener); } catch (e) {}
+    const call = (fn, ...a) => { try { return api[fn](...a); } catch (e) { return ''; } };
+    const set = (k, v) => call('LMSSetValue', k, String(v));
+    function init() {
+      if (!api || state !== 'none') return;
+      if (String(call('LMSInitialize', '')) !== 'true') { api = null; return; }
+      state = 'open'; t0 = Date.now();
+      const st = String(call('LMSGetValue', 'cmi.core.lesson_status') || '');
+      if (!st || st === 'not attempted') { set('cmi.core.lesson_status', 'incomplete'); call('LMSCommit', ''); }
+    }
+    function studentName() {
+      if (!api) return '';
+      const raw = String(call('LMSGetValue', 'cmi.core.student_name') || '').trim(); // SCORM 1.2: "Last, First"
+      const m = raw.match(/^([^,]+),\s*(.+)$/);
+      return m ? (m[2] + ' ' + m[1]).trim() : raw;
+    }
+    const sessionTime = () => { // HHHH:MM:SS.SS
+      let s = Math.max(0, (Date.now() - t0) / 1000); const h = Math.floor(s / 3600); s -= h * 3600; const mi = Math.floor(s / 60); s -= mi * 60;
+      return String(h).padStart(4, '0') + ':' + String(mi).padStart(2, '0') + ':' + s.toFixed(2).padStart(5, '0');
+    };
+    const PASS = /^(PASS|PASSED|GOLD|SILVER|BRONZE|COMPLETE|COMPLETED|CLEARED)\b/i;
+    function finish() { if (state !== 'open') return; set('cmi.core.session_time', sessionTime()); call('LMSCommit', ''); call('LMSFinish', ''); state = 'finished'; }
+    // rec: {result, score?} -> {passed, score} sent to the LMS; false when not in an LMS
+    function report(rec) {
+      if (!api) return false;
+      init(); if (state !== 'open') return false;
+      const passed = PASS.test(String(rec && rec.result || ''));
+      let score = Number(rec && rec.score);
+      score = isFinite(score) && rec.score !== '' && rec.score != null ? Math.round(Math.max(0, Math.min(100, score))) : (passed ? 100 : 0);
+      set('cmi.core.score.min', 0); set('cmi.core.score.max', 100); set('cmi.core.score.raw', score);
+      set('cmi.core.lesson_status', passed ? 'passed' : 'failed');
+      set('cmi.core.exit', passed ? '' : 'suspend');
+      call('LMSCommit', '');
+      if (passed) finish();
+      return { passed, score };
+    }
+    if (api) { document.readyState === 'loading' ? addEventListener('DOMContentLoaded', init) : init(); addEventListener('pagehide', finish); addEventListener('beforeunload', finish); }
+    return { get active() { return !!api; }, get state() { return state; }, init, report, finish, studentName, _api: () => api };
+  })();
+
   // ---------- results: server / Google Sheets / offline queue ----------
   const isClaude = () => /claude\.ai|claudeusercontent/.test(location.hostname);
   const onWeb = () => /^https?:$/.test(location.protocol) && !isClaude();
+  const ownSite = () => onWeb() && !lms.active && typeof SL_OFFLINE_FILE === 'undefined'; // our own server (not an LMS, not a copied offline file)
   const sheetsUrl = () => QS.get('results') || '';
   function targets() {
     const t2 = [];
-    if (onWeb()) t2.push({ url: 'api/result', mode: 'json' });
+    if (ownSite()) t2.push({ url: 'api/result', mode: 'json' });
     if (sheetsUrl()) t2.push({ url: sheetsUrl(), mode: 'sheets' });
     return t2;
   }
+  // -> {status: 'sent'|'retry'|'rejected', json}
   async function sendOne(tg, payload) {
     if (tg.mode === 'sheets') { // Apps Script web apps do not answer CORS; send as simple text and trust it arrived
       await fetch(tg.url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
-      return true;
+      return { status: 'sent', json: null };
     }
     const r = await fetch(tg.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    return r.ok;
+    if (r.ok) { let json = null; try { json = await r.json(); } catch (e) {} return { status: 'sent', json }; }
+    // 4xx (bad data, no such endpoint) will never succeed: do not keep it in the queue. 408/429/5xx: try again later.
+    return { status: r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429 ? 'rejected' : 'retry', json: null };
   }
+
+  // Offline queue: IndexedDB ('site-life' / 'queue'), falling back to localStorage when IndexedDB is
+  // blocked (private mode, sandboxed frames). Max 50 items; flushed on load and when back online.
+  const QMAX = 50;
+  const idb = (() => {
+    let dbp = null;
+    function open() {
+      if (!dbp) dbp = new Promise((res, rej) => {
+        try {
+          const r = indexedDB.open('site-life', 1);
+          r.onupgradeneeded = () => r.result.createObjectStore('queue', { keyPath: 'k', autoIncrement: true });
+          r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blocked'));
+        } catch (e) { rej(e); }
+      });
+      return dbp;
+    }
+    function run(mode, fn) {
+      return open().then(db => new Promise((res, rej) => {
+        const tx = db.transaction('queue', mode), st = tx.objectStore('queue'); let out;
+        fn(st, v => { out = v; });
+        tx.oncomplete = () => res(out); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
+      }));
+    }
+    return {
+      all: () => run('readonly', (st, done) => { const r = st.getAll(); r.onsuccess = () => done(r.result); }),
+      add: (x) => run('readwrite', (st) => {
+        st.add(x);
+        const c = st.getAllKeys(); c.onsuccess = () => { const ks = c.result; for (let i = 0; i < ks.length - QMAX; i++) st.delete(ks[i]); };
+      }),
+      del: (keys) => run('readwrite', (st) => keys.forEach(k => st.delete(k))),
+    };
+  })();
+  let useIdb = typeof indexedDB !== 'undefined';
+  const lsQueue = { all: () => store.get('queue', []), set: (q) => store.set('queue', q.slice(-QMAX)) };
+  const emit = (name, detail) => { try { dispatchEvent(new CustomEvent(name, { detail })); } catch (e) {} };
+  let flushing = null;
   const queue = {
-    all() { return store.get('queue', []); },
-    add(x) { const q = this.all(); q.push(x); store.set('queue', q.slice(-50)); },
-    async flush() {
-      const q = this.all(); if (!q.length) return 0; const left = []; let sent = 0;
-      for (const item of q) { try { (await sendOne(item.tg, item.p)) ? sent++ : left.push(item); } catch (e) { left.push(item); } }
-      store.set('queue', left); return sent;
+    // all queued items: [{tg, p, at}]
+    async all() {
+      if (useIdb) try { return (await idb.all()).map(({ k, ...x }) => x).concat(lsQueue.all()); } catch (e) { useIdb = false; }
+      return lsQueue.all();
+    },
+    async size() { return (await this.all()).length; },
+    async add(x) {
+      x = Object.assign({ at: Date.now() }, x);
+      if (useIdb) try { await idb.add(x); return; } catch (e) { useIdb = false; }
+      const q = lsQueue.all(); q.push(x); lsQueue.set(q);
+    },
+    // send everything waiting; returns how many were sent. Fires a 'sl-sent' event {id, payload} per sent result.
+    flush() {
+      if (flushing) return flushing;
+      flushing = (async () => {
+        let sent = 0;
+        const tryItem = async (item) => {
+          try { const r = await sendOne(item.tg, item.p); if (r.status === 'sent') { sent++; emit('sl-sent', { id: r.json && r.json.id || null, payload: item.p }); } return r.status !== 'retry'; }
+          catch (e) { return false; }
+        };
+        if (useIdb) try {
+          const items = await idb.all(), done = [];
+          for (const it of items) if (await tryItem(it)) done.push(it.k);
+          if (done.length) await idb.del(done);
+        } catch (e) { useIdb = false; }
+        // localStorage queue (older versions of the game, or no IndexedDB): move to IndexedDB or retry here
+        const old = lsQueue.all();
+        if (old.length) { const left = []; for (const it of old) if (!(await tryItem(it))) left.push(it); lsQueue.set(left); }
+        return sent;
+      })().finally(() => { flushing = null; });
+      return flushing;
     },
   };
-  // returns 'sent' | 'queued' | 'none' (no target configured) | 'noconsent'
-  async function post(payload) {
-    const tg = targets(); if (!tg.length) return 'none';
-    if (!consent.ok()) return 'noconsent';
+  let lastId = null, lastResponse = null;
+  // Send a game result. Also reports it to the LMS when running inside one (SCORM 1.2).
+  // Resolves 'sent' | 'queued' | 'none' (no target configured) | 'noconsent'.
+  // The server answers {ok:true, id}: the id is in SL.lastId and is passed to cb({status, id, json}) when given.
+  async function post(payload, cb) {
+    try { lms.report(payload); } catch (e) {}
+    const done = (status, id = null, json = null) => { if (cb) try { cb({ status, id, json }); } catch (e) {} return status; };
+    const tg = targets(); if (!tg.length) return done('none');
+    if (!consent.ok()) return done('noconsent');
     payload = Object.assign({ lang, client: navigator.userAgent.slice(0, 80) }, payload);
-    let any = false;
+    let any = false, id = null, json = null;
     for (const x of tg) {
-      try { if (await sendOne(x, payload)) any = true; else queue.add({ tg: x, p: payload }); }
-      catch (e) { queue.add({ tg: x, p: payload }); }
+      try {
+        const r = await sendOne(x, payload);
+        if (r.status === 'sent') { any = true; if (r.json) { json = r.json; if (r.json.id != null) id = r.json.id; } }
+        else if (r.status === 'retry') await queue.add({ tg: x, p: payload });
+      } catch (e) { await queue.add({ tg: x, p: payload }).catch(() => {}); }
     }
-    return any ? 'sent' : 'queued';
+    if (any) { lastId = id; lastResponse = json; }
+    return done(any ? 'sent' : 'queued', id, json);
   }
-  addEventListener('online', () => queue.flush());
-  setTimeout(() => queue.flush(), 3000);
+  // Link to the printable certificate for a result id from our server; null when there is no server.
+  const certLink = (id) => (id != null && id !== '' && ownSite()) ? 'cert/' + encodeURIComponent(id) : null;
 
-  // installable offline app (only when served from our own web server)
-  if (onWeb() && 'serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  addEventListener('online', () => queue.flush());
+  const flushSoon = () => setTimeout(() => queue.flush(), 1500);
+  document.readyState === 'complete' ? flushSoon() : addEventListener('load', flushSoon);
+
+  // installable offline app (only on our own web server; not inside an LMS or for the copied offline files)
+  if (ownSite()) {
+    const head = document.head || document.documentElement;
+    const addTag = (tag, attrs) => { if (head.querySelector(`${tag}[${Object.keys(attrs)[0]}="${Object.values(attrs)[0]}"]`)) return; const el = document.createElement(tag); for (const k in attrs) el.setAttribute(k, attrs[k]); head.appendChild(el); };
+    if (!head.querySelector('link[rel="manifest"]')) addTag('link', { rel: 'manifest', href: 'manifest.webmanifest' });
+    if (!head.querySelector('meta[name="theme-color"]')) addTag('meta', { name: 'theme-color', content: '#0f7a4f' });
+    addTag('link', { rel: 'apple-touch-icon', href: 'icons/apple-touch-icon.png' });
+    if ('serviceWorker' in navigator) {
+      const reg = () => navigator.serviceWorker.register('sw.js').catch(() => {});
+      document.readyState === 'complete' ? reg() : addEventListener('load', reg);
+    }
+  }
 
   applyCss();
-  return { QS, store, t, LANGS, get lang() { return lang; }, setLang, misses, consent, settings, quality, markerColor, fps, openSettings, caption, speak, stopSpeak, post, queue, onWeb, isClaude, escH };
+  return { QS, store, t, LANGS, get lang() { return lang; }, setLang, misses, consent, settings, quality, markerColor, fps, openSettings, caption, speak, stopSpeak,
+    post, queue, get lastId() { return lastId; }, get lastResponse() { return lastResponse; }, certLink, lms, onWeb, ownSite, isClaude, escH };
 })();
 const tr = SL.t;
