@@ -12,7 +12,15 @@ here = os.path.dirname(os.path.abspath(__file__)); root = os.path.dirname(here)
 rd = lambda p: open(os.path.join(here, p), encoding='utf8').read()
 def wr(p, s): open(os.path.join(root, p), 'w', encoding='utf8').write(s)
 
+import json, glob
 engine, common = rd('engine.js'), rd('common.js')
+# Translations: src/i18n/<lang>.json (keys are the English strings). strings-en.json is the source list, not a language.
+i18n = {}
+for f in sorted(glob.glob(os.path.join(here, 'i18n', '*.json'))):
+    l = os.path.basename(f)[:-5]
+    if l.startswith('strings-'): continue
+    i18n[l] = {k: v for k, v in json.load(open(f, encoding='utf8')).items() if not k.startswith('_') and v}
+common = 'const SL_I18N = ' + json.dumps(i18n, ensure_ascii=False).replace('</', '<\\/') + ';\n' + common
 factory_src = rd('factory.html')
 css = factory_src[factory_src.index('<style>') + 7:factory_src.index('</style>')]
 CDN = ('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n'

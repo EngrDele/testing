@@ -1,3 +1,4 @@
 hse-key.txt
 server/data/
 tests/vendor/
+tests/out/

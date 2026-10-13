@@ -9,6 +9,10 @@ const ROOT = path.resolve(__dirname, '..');
 const VENDOR = path.join(__dirname, 'vendor');
 const BASE = process.env.BASE_URL || 'file://' + ROOT + '/';
 const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'home', 'school'];
+const LANG = process.env.GAME_LANG || '';               // e.g. GAME_LANG=pcm to play in Pidgin
+const withLang = (u) => LANG ? u + (u.includes('?') ? '&' : '?') + 'lang=' + LANG : u;
+const MISSES = new Set();                               // untranslated on-screen strings (written to tests/out/)
+async function collectMisses(p) { if (LANG) (await p.evaluate(() => [...SL.misses])).forEach(x => MISSES.add(x)); }
 const fail = (m) => { console.error('FAIL:', m); process.exitCode = 1; };
 
 async function page(browser, url) {
@@ -19,7 +23,7 @@ async function page(browser, url) {
     await p.route('**/Sky.js', r => r.fulfill({ body: fs.readFileSync(sky), contentType: 'application/javascript' }));
   }
   p.errs = []; p.on('pageerror', e => p.errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') p.errs.push(m.text().slice(0, 200)); });
-  await p.goto(url); await p.waitForTimeout(3500);
+  await p.goto(withLang(url)); await p.waitForTimeout(3500);
   return p;
 }
 const step = (p, n, code) => p.evaluate(([n, code]) => { if (code) (new Function(code))(); for (let i = 0; i < n && !paused && !S.over; i++) update(0.05); render3D(.05); drawHUD(); }, [n, code || null]);
@@ -48,6 +52,7 @@ async function factory(browser) {
   await resolve(); await step(p, 2, 'S.p.x=1470;S.p.y=1000;'); await p.waitForTimeout(300);
   const st = await p.evaluate(() => ({ zones: Object.keys(S.results).length, of: ZONES.length, haz: S.hazFound, over: S.over }));
   const title = await p.$eval('.modal h1', e => e.innerText).catch(() => '');
+  await collectMisses(p);
   console.log('factory', JSON.stringify(st), title);
   if (!/passed/i.test(title) || st.zones !== st.of) fail('factory did not pass');
   if (p.errs.length) fail('factory errors: ' + p.errs.join(' | '));
@@ -80,6 +85,7 @@ async function kids(browser, world) {
   await p.waitForTimeout(300);
   const st = await p.evaluate(() => ({ done: Object.keys(S.results).length, of: MISS.length, stars: S.stars, hearts: S.hearts, haz: S.hazFound + '/' + S.hazTotal }));
   const title = await p.$eval('.modal h1', e => e.innerText).catch(() => '');
+  await collectMisses(p);
   console.log(world, JSON.stringify(st), title);
   if (!/did it/i.test(title) || st.done !== st.of) fail(world + ' did not finish');
   if (p.errs.length) fail(world + ' errors: ' + p.errs.join(' | '));
@@ -93,5 +99,6 @@ async function kids(browser, world) {
     for (const w of ['home', 'school']) if (want.includes(w)) await kids(browser, w);
   } catch (e) { fail(e.stack || e.message); }
   await browser.close();
+  if (LANG) { fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true }); fs.writeFileSync(path.join(__dirname, 'out', 'missing-' + LANG + '.json'), JSON.stringify([...MISSES].sort(), null, 1)); console.log('untranslated strings seen:', MISSES.size, '-> tests/out/missing-' + LANG + '.json'); }
   console.log(process.exitCode ? 'SOME TESTS FAILED' : 'ALL PLAYTHROUGHS PASSED');
 })();

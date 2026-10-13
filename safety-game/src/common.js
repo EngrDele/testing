@@ -49,7 +49,11 @@ const SL = (() => {
       if (d[body] != null) return s.replace(core, m[1] + d[body]);
       if (d[m[2]] != null) return s.replace(core, m[1] + d[m[2]] + m[3]);
     }
-    for (const p of PAT[lang] || []) { const mm = core.match(p.re); if (mm) return s.replace(core, p.out.replace(/\{(\d)\}/g, (_, i) => mm[+i + 1])); }
+    const sub = v => v.split(', ').map(x => { const d2 = I18N[lang] || {}; return d2[x] != null ? d2[x] : x; }).join(', ');
+    for (const p of PAT[lang] || []) {
+      const mm = core.match(p.re); if (mm) return s.replace(core, p.out.replace(/\{(\d)\}/g, (_, i) => sub(mm[+i + 1])));
+      if (m) { const m2 = (m[2] + m[3]).match(p.re); if (m2) return s.replace(core, m[1] + p.out.replace(/\{(\d)\}/g, (_, i) => sub(m2[+i + 1]))); }
+    }
     if (core.length > 2 && core.length < 400) misses.add(core);
     return s;
   }
