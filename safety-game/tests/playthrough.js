@@ -1,5 +1,5 @@
 // End-to-end playthrough of all three games in headless Chromium.
-// Usage (from safety-game/):  bash tests/setup.sh  &&  node tests/playthrough.js [factory|advanced|oga|home|school|market|water|online ...]
+// Usage (from safety-game/):  bash tests/setup.sh  &&  node tests/playthrough.js [factory|advanced|oga|home|school|market|water|online|little ...]
 // Env: BASE_URL (default file://.../index.html dir), HEADED=1 to watch.
 // The games are driven by calling update() directly: software WebGL in CI renders ~1 fps,
 // so waiting on requestAnimationFrame is far too slow (see CLAUDE.md "Testing").
@@ -9,7 +9,7 @@ const ROOT = path.resolve(__dirname, '..');
 const VENDOR = path.join(__dirname, 'vendor');
 const BASE = process.env.BASE_URL || 'file://' + ROOT + '/';
 const KIDS = ['home', 'school', 'market', 'water', 'online'];
-const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'advanced', 'oga', 'builder', ...KIDS];
+const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'advanced', 'oga', 'builder', ...KIDS, 'little'];
 // Screenshots of the newer kids worlds (player x, y, camera yaw), written to tests/out/<world>-<n>.png
 const SHOTS = { market: [[120, 500, -0.6], [700, 690, 0.4], [1060, 1060, -1.2]], water: [[150, 480, -0.7], [360, 810, 2.6], [1250, 790, 2.9]], online: [[600, 560, 0.3], [330, 320, 0.2], [700, 760, 2.8]] };
 const LANG = process.env.GAME_LANG || '';               // e.g. GAME_LANG=pcm to play in Pidgin
@@ -31,8 +31,8 @@ async function collectMisses(p) {
 }
 const fail = (m) => { console.error('FAIL:', m); process.exitCode = 1; };
 
-async function page(browser, url) {
-  const p = await browser.newPage({ viewport: { width: 900, height: 620 } });
+async function page(browser, url, viewport = { width: 900, height: 620 }) {
+  const p = await browser.newPage({ viewport });
   const three = path.join(VENDOR, 'three.min.js'), sky = path.join(VENDOR, 'Sky.js');
   if (fs.existsSync(three)) {
     await p.route('**/three.min.js', r => r.fulfill({ body: fs.readFileSync(three), contentType: 'application/javascript' }));
@@ -169,6 +169,84 @@ async function kids(browser, world) {
   await p.close();
 }
 
+// Little Stars (3–6): plays all 10 scenes as two "Play 5 in a row" runs on a phone-sized page, with one deliberate
+// wrong tap (gentle retry + hint, no fail), checks every sticker and the posted results, and takes screenshots of the
+// menu and every scene (phone) plus the menu and 5 scenes at desktop size -> tests/out/little-*.png
+async function little(browser) {
+  const OUT = path.join(__dirname, 'out'); fs.mkdirSync(OUT, { recursive: true });
+  const shot = async (p, name) => { await p.evaluate(() => { if (window.LS && LS.state().scene) LS.render(); }); await p.screenshot({ path: path.join(OUT, 'little-' + name + '.png'), timeout: 240000 }); };
+  const p = await page(browser, BASE + 'little.html?class=Test-Class_1', { width: 390, height: 844 });
+  await p.evaluate(() => { localStorage.removeItem('sl-little-stickers'); localStorage.removeItem('sl-little-kid'); localStorage.removeItem('sl-little-phone'); });
+  await p.reload(); await p.waitForTimeout(3000);
+  await p.evaluate(() => { requestAnimationFrame = () => 0; });   // drive frames from the test (software WebGL is slow)
+  await p.fill('#nm', 'Ada'); await p.fill('#pn', 'Mummy Ngozi'); await p.fill('#ph', '08031234567'); await p.check('#slConsent');
+  await shot(p, 'start-phone');
+  await p.click('#start'); await p.waitForTimeout(300);
+  await p.evaluate(() => { window.__res = []; const o = SL.post; SL.post = (x, cb) => { window.__res.push(x); return o(x, cb); }; });   // capture posted results
+  await shot(p, 'menu-phone');
+  const tap = (id) => p.evaluate((id) => { const c = document.querySelector('[data-card="' + id + '"]'); if (c && !(ENT[id] && ENT[id].on)) { c.click(); return 'card'; } return LS.tapId(id); }, id);
+  let wrongDone = false;
+  async function playScene() {
+    const st0 = await p.evaluate(() => LS.state());
+    await p.evaluate(() => LS.flush());
+    await shot(p, st0.scene + '-phone');
+    for (let i = 0; i < 400; i++) {
+      const st = await p.evaluate(() => LS.state());
+      if (st.modal) break;
+      if (st.scene === 'hot' && !wrongDone && st.step === 0 && !st.busy) {   // deliberate wrong taps: gentle retry, then a hint, never a fail
+        wrongDone = true;
+        const r1 = await tap('banana'); const s1 = await p.evaluate(() => LS.state());
+        const want = await p.evaluate(() => SL.t("That is a banana. It is not hot. Let's try again."));
+        if (r1 !== 'no' || s1.misses !== 1 || s1.modal || s1.step !== 0) fail('little: wrong tap not handled gently ' + JSON.stringify(s1));
+        if (s1.caption !== want) fail('little: wrong-tap line not spoken: ' + s1.caption);
+        await tap('teddy'); const s2 = await p.evaluate(() => LS.state());
+        if (!s2.hint || s2.misses !== 2) fail('little: no hint after two misses ' + JSON.stringify(s2));
+        await p.evaluate(() => LS.step(2, .1)); await shot(p, 'hint-phone');
+        console.log('  wrong taps: gentle retry ok, hint ok');
+      }
+      const n = await p.evaluate(() => LS.next());
+      if (n) await tap(n); else await p.evaluate(() => LS.step(5, .2));
+      await p.evaluate(() => LS.flush());
+    }
+    const st = await p.evaluate(() => LS.state());
+    const title = await p.$eval('.modal h1', e => e.innerText).catch(() => '');
+    if (!st.modal || !st.stickers.includes(st0.scene)) fail('little: scene ' + st0.scene + ' did not finish ' + JSON.stringify(st));
+    console.log('  ' + st0.scene, 'sticker:', st.stickers.includes(st0.scene), title);
+    return st0.scene;
+  }
+  async function run(label) {
+    await p.click('#five'); await p.waitForTimeout(200);
+    const ids = await p.evaluate(() => LS.state().run.ids);
+    for (let i = 0; i < ids.length; i++) { await playScene(); if (i < ids.length - 1) await p.click('#next'); }
+    await shot(p, 'end-' + label + '-phone');
+    await p.click('#toBook'); await p.waitForTimeout(200);
+    return ids;
+  }
+  const ids1 = await run('1'), ids2 = await run('2');
+  await shot(p, 'menu-done-phone');
+  const res = await p.evaluate(() => window.__res);
+  const st = await p.evaluate(() => LS.state());
+  console.log('little runs', JSON.stringify(ids1), JSON.stringify(ids2), 'stickers', st.stickers.length);
+  if (st.stickers.length !== 10) fail('little: not every sticker earned');
+  if (res.length !== 2) fail('little: expected 2 posted results, got ' + res.length);
+  for (const [i, r] of res.entries()) {
+    console.log('  result:', JSON.stringify(r));
+    const want = [ids1, ids2][i];
+    if (r.game !== 'little' || r.result !== 'COMPLETE' || r.role !== 'Child 3-6' || r.name !== 'Ada') fail('little: bad result ' + JSON.stringify(r));
+    if (JSON.stringify(r.scenes) !== JSON.stringify(want) || r.stars !== 5) fail('little: scenes in result do not match the run');
+    if (r.class !== 'Test-Class1') fail('little: class code missing or not sanitised');
+    if (Object.keys(r.zoneTimes || {}).length !== 5) fail('little: zoneTimes incomplete');
+    if (/0803|1234567/.test(JSON.stringify(r))) fail('little: the phone number must never be sent');
+  }
+  // desktop screenshots: menu and 5 scenes
+  await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(200);
+  await shot(p, 'menu-desktop');
+  for (const id of ['hot', 'medicine', 'road', 'lost', 'hands']) { await p.evaluate((id) => { LS.play([id]); LS.flush(); LS.step(3, .05); }, id); await shot(p, id + '-desktop'); await p.evaluate(() => LS.showBook()); }
+  await collectMisses(p);
+  if (p.errs.length) fail('little errors: ' + p.errs.join(' | '));
+  await p.close();
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: !process.env.HEADED, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
@@ -177,6 +255,7 @@ async function kids(browser, world) {
     if (want.includes('oga')) await oga(browser);
     if (want.includes('builder')) await builder(browser);
     for (const w of KIDS) if (want.includes(w)) await kids(browser, w);
+    if (want.includes('little')) await little(browser);
   } catch (e) { fail(e.stack || e.message); }
   await browser.close();
   if (LANG) { fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true }); fs.writeFileSync(path.join(__dirname, 'out', 'missing-' + LANG + '.json'), JSON.stringify([...MISSES].sort(), null, 1)); console.log('untranslated strings seen:', MISSES.size, '-> tests/out/missing-' + LANG + '.json', '(plus', RECHECKED.size, 'already-translated strings re-checked by the page)'); }

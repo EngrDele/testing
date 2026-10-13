@@ -13,6 +13,7 @@ Read `CONCEPT.md` for the product idea, `ROADMAP.md` for status and what is next
 | Oga Mode (supervisor stops unsafe acts against the clock) | `index.html?mode=oga` | Supervisors |
 | Home → School Bus, School Safety | `kids.html?world=home`, `?world=school` | Kids 6–12 |
 | Market & Road Trip, Beach & Pool, Online Safety | `kids.html?world=market`, `water`, `online` | Kids |
+| Little Stars (10 tap-only scenes, sticker book, parent tips) | `little.html` | Children 3–6 with a parent |
 | Site Builder (2D editor for a client's compound) | `builder.html` | HSE staff / sales |
 
 Useful URL options: `?lang=pcm|yo|ha|ig`, `?site=sites/<file>.json` (or `?site=local` for the builder draft), `?room=CODE` (group session), `&trainer=1`, `?class=CODE` (kids class/family code), `?hse=<whatsapp number>&email=<addr>`, `?results=<Google Apps Script URL>`.
@@ -27,9 +28,10 @@ Useful URL options: `?lang=pcm|yo|ha|ig`, `?site=sites/<file>.json` (or `?site=l
 | `src/common.js` | Shared `SL` layer: consent, translation, settings, captions, results posting with offline queue, SCORM (`SL.lms`), service worker | ✅ |
 | `src/room.js` | `SLRoom`: group sessions (results server polling or the claude.ai `room` capability) | ✅ |
 | `src/kids-game.js`, `src/kids-shell.html` | Kids games (all worlds) and their page shell | ✅ |
+| `src/little-game.js`, `src/little-shell.html` | Little Stars (ages 3–6) and its page shell | ✅ |
 | `src/builder.html` | Site builder source | ✅ |
 | `src/i18n/<lang>.json` | Translations, keyed by the exact English text (`strings-en.json` is the collected source list) | ✅ |
-| `index.html`, `kids.html`, `builder.html`, `site-life-offline.html`, `kids-offline.html` | **Generated** by `src/build.py` | ❌ rebuild |
+| `index.html`, `kids.html`, `little.html`, `builder.html`, `site-life-offline.html`, `kids-offline.html`, `little-offline.html` | **Generated** by `src/build.py` | ❌ rebuild |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Installable offline app (service worker) | ✅ |
 | `src/scorm.py` | Builds SCORM 1.2 zips into `dist/scorm/` for Moodle/TalentLMS | ✅ |
 | `lite.html` | Older 2D version, fallback when WebGL fails | rarely |
@@ -48,7 +50,7 @@ python3 src/build.py tests/vendor/three.min.js tests/vendor/Sky.js   # rebuild e
 python3 -m unittest tests/test_server.py  # server unit tests
 bash tests/server-test.sh                 # server smoke tests
 node tests/playthrough.js                 # plays every game + the builder to the end (slow: 15–25 min with software WebGL)
-node tests/playthrough.js oga market      # or only some: factory advanced oga builder home school market water online
+node tests/playthrough.js oga market      # or only some: factory advanced oga builder home school market water online little
 GAME_LANG=pcm node tests/playthrough.js   # play in Pidgin; untranslated strings go to tests/out/missing-pcm.json
 node tests/a11y-test.js; node tests/room-test.js; node tests/offline-test.js; node tests/scorm-test.js; node tests/engine-extras-test.js
 ```
@@ -89,6 +91,13 @@ Everything must print `PASSED`. The generated pages are committed, and CI (`.git
 - `DATA[world]` declares `missions` (ordered, optional `when()`, question `q`), `hazards` (`h: 1` danger, `0` safe decoy), `start`, `escort`, `intro`. Each world has a `build<World>()`.
 - Road safety uses `ROADS`, `ZEBRAS` and `VEH` lanes. Hearts and stars replace the factory's body bars.
 
+### Little Stars (`src/little-game.js`, ages 3–6)
+- `SCENES` lists 10 scenes; each has `build()` (one small diorama built into `G.root` and disposed when the scene ends), `steps`, `rule`, `tip` (parent card) and an optional `review` note. A step has `say` (spoken prompt), `ok` (ids to tap, 3D objects registered with `tapObj(id, obj)` or picture `cards`), `decoys`, `yes`/`no` lines, `order`, `need`/`repeat` (scrubbing), an optional `view` (camera zoom) and hooks `enter`, `onOk`, `check` (e.g. "wait, the danfo is coming").
+- No losing: a wrong tap is a gentle line plus a soft sound; after 2 misses the right thing pulses (ring on screen). Stickers live in `SL.store('little-stickers')`; the parent's phone number (sing-along) only in `SL.store('little-phone')` and is never posted.
+- Results: one `SL.post({game:'little', result:'COMPLETE', scenes, stars, zoneTimes, class, …})` per run (one scene or "Play 5 in a row").
+- Timers, speech and animations run on game time (`later()`, `update(dt)`). Test hook `window.LS`: `play(ids)`, `next()`, `tapId(id)`, `flush()`, `step(n, dt)`, `state()`.
+- The body-safety scene (`body`) must be reviewed by a child-protection professional before use in schools.
+
 ### Shared layer `SL` (`src/common.js`)
 - **Translation**: `tr()` / `SL.t()`, plus a MutationObserver that translates every text node (exact match → match without the emoji prefix → `{0}` patterns). Add new English UI text and its Pidgin to `src/i18n/pcm.json`. Mark nodes that must not be translated with `data-notr`.
 - **Consent** (NDPA 2023) before anything is sent; **settings** (quality with an fps watchdog, text size, captions, voice, colour-blind markers); number keys 1–9 answer questions.
@@ -104,7 +113,7 @@ Everything must print `PASSED`. The generated pages are committed, and CI (`.git
 Players with the same group code see each other. On our own server it polls `/api/room/<CODE>`; in the claude.ai artifact it uses the `room` capability (named room `g-<code>`; editors are trainers). Trainers (`&trainer=1`, the artifact's editors, or `/trainer?room=CODE` on the server) can send `fire_alarm`, `nepa`, `spill`, `rain`, `end`.
 
 ### Publishing the claude.ai artifact
-Publish `index.html` with `files: {"lite.html": …, "kids.html": …, "builder.html": …}`. Omit `capabilities` to keep the stored declaration (db rules: `results` read admin / write owner; `results/{self}` read and write interact). The `room` capability must be declared (once) for group sessions to work there.
+Publish `index.html` with `files: {"lite.html": …, "kids.html": …, "little.html": …, "builder.html": …}`. Omit `capabilities` to keep the stored declaration (db rules: `results` read admin / write owner; `results/{self}` read and write interact). The `room` capability must be declared (once) for group sessions to work there.
 
 ## Gotchas
 - **Don't kill processes with `pkill -f` or a `ps | grep` pattern that also matches your own shell command.** It kills your shell (exit 144). Use the PID from `$!`. `ss` is not installed in the sandbox.

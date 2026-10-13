@@ -22,6 +22,7 @@ The `game-researcher` agent (`.claude/agents/game-researcher.md`) adds ideas her
 | Market & road trip | `kids.html?world=market` | Children |
 | Beach & pool | `kids.html?world=water` | Children |
 | Online safety | `kids.html?world=online` | Children |
+| Little Stars: 10 tap-only scenes (hot things, water, medicine, electricity, road, fire, lost, body safety, hand washing, car/keke seat) | `little.html` | Children 3–6 with a parent |
 
 ## Candidates
 | Idea | Audience | Why (source) | Score |

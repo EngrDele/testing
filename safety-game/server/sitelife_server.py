@@ -34,11 +34,11 @@ HOST = os.environ.get("HOST", "0.0.0.0")
 RESULTS = os.path.join(DATA_DIR, "results.jsonl")
 TS = "%Y-%m-%d %H:%M:%S"
 MAX_BODY = 32 * 1024
-PASSING = {"PASS", "PASSED", "GOLD", "SILVER", "BRONZE"}
+PASSING = {"PASS", "PASSED", "GOLD", "SILVER", "BRONZE", "COMPLETE"}   # COMPLETE: Little Stars (no pass/fail for ages 3-6)
 GAMES = {"factory": "🏭 Factory induction", "factory-advanced": "🏗️ Factory (advanced)", "oga": "🦺 Oga Mode (supervisor)",
          "home": "🏠 Home → School Bus", "school": "🏫 School Safety", "market": "🛒 Market & Road", "water": "🏊 Water Safety",
-         "online": "📱 Online Safety"}
-KIDS_GAMES = {"home", "school", "market", "water", "online"}
+         "online": "📱 Online Safety", "little": "⭐ Little Stars (3–6)"}
+KIDS_GAMES = {"home", "school", "market", "water", "online", "little"}
 CSV_FIELDS = ["id", "received", "game", "course", "name", "company", "role", "class", "result", "stars", "hazards", "mistakes",
               "where", "missed", "wrong", "zoneTimes", "room", "lang", "date", "expires", "status"]
 ID_CHARS = string.ascii_letters + string.digits

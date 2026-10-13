@@ -15,6 +15,7 @@ All items below have a first version built, except 13 (real client scans: the `p
 | 8 | Oga Mode | ✅ `?mode=oga` |
 | 9 | Multiplayer | ✅ group code (server polling or artifact `room`); **Next:** voice chat, trainer view of everyone on the map |
 | 10 | More kids worlds | ✅ market, water, online |
+| 10b | Little Stars (ages 3–6) | ✅ `little.html`: 10 tap-only scenes, stickers, parent tips, Pidgin. **Next:** body-safety scene review by a child-protection professional; recorded voice-overs |
 | 11 | Class / family codes | ✅ `?class=`, `/hse/class` |
 | 12 | glTF characters | 🟡 hook ready (`makeHumanGLTF`, `SL_AVATAR_URL`); needs licensed avatar files |
 | 13 | Real client sites | 🟡 hook ready (`placeSiteModel`); needs a scan |

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Little Stars</title><style>/*@@CSS@@*/
+/* ---------- Little Stars (ages 3–6): big, round, bright; pictures and voice first ---------- */
+:root{--sun:#ffd23f;--sky:#bfe6ff;--pink:#ff8fb1;--leaf:#5cc97b;--sea:#3fa7ff;--grape:#9b7bff;--card:#ffffff;--cardInk:#2a2340}
+html,body{background:linear-gradient(#bfe6ff,#fff3d6);font-family:ui-rounded,"Nunito","Varela Round","Trebuchet MS",system-ui,sans-serif}
+canvas#game{background:linear-gradient(#bfe6ff,#fff3d6)}
+.lbtn{position:fixed;z-index:6;width:58px;height:58px;border-radius:50%;border:3px solid #fff;background:#fff;color:#2a2340;font-size:26px;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 4px 12px rgba(40,30,80,.25)}
+#homeBtn{left:12px;top:12px}#setBtn2{right:12px;top:12px}
+#sayBtn{left:12px;bottom:18px;width:78px;height:78px;font-size:36px;background:var(--sun);border-color:#fff7cf}
+#sayBtn small{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;white-space:nowrap;color:#2a2340;background:#fff;border-radius:999px;padding:1px 7px}
+#topPill{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:6;background:#fff;color:#2a2340;border-radius:999px;padding:6px 16px;font-weight:800;box-shadow:0 4px 12px rgba(40,30,80,.2);display:flex;gap:10px;align-items:center;max-width:calc(100vw - 160px);white-space:nowrap;overflow:hidden}
+#topPill .dots{display:flex;gap:4px}#topPill .dots i{width:14px;height:14px;border-radius:50%;background:#e4def5;display:inline-block}#topPill .dots i.on{background:var(--sun);box-shadow:0 0 0 2px #f2b705 inset}
+#topPill .tt{overflow:hidden;text-overflow:ellipsis;font-size:.95rem}
+body.inbook #slCaption{top:auto;bottom:18px}
+#slCaption{bottom:auto;top:72px;font-size:1.05rem;border-radius:16px;background:rgba(42,35,64,.82)}
+#cards{position:fixed;left:100px;right:12px;bottom:14px;z-index:6;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.card{min-width:104px;max-width:150px;min-height:104px;flex:1 1 104px;border-radius:26px;background:var(--card);color:var(--cardInk);border:4px solid #fff;box-shadow:0 6px 0 rgba(40,30,80,.18),0 8px 18px rgba(40,30,80,.18);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 6px;font-weight:800;font-size:.82rem;line-height:1.15;text-align:center;transition:transform .12s}
+.card .e{font-size:44px;line-height:1.05}
+.card:active{transform:translateY(3px) scale(.97)}
+.card.c0{background:#fff1b8}.card.c1{background:#d4f5dd}.card.c2{background:#dcecff}.card.c3{background:#ffe0ea}.card.c4{background:#ece4ff}
+.card.ok{border-color:#2fbf5b;background:#c9f7d6}.card.no{animation:wob .4s}
+.card.hint{animation:pulse 1s infinite;border-color:#ffb300}
+.card .num{position:absolute;margin:-84px 0 0 -84px;font-size:11px;opacity:.55}
+@keyframes wob{25%{transform:rotate(-6deg)}75%{transform:rotate(6deg)}}
+@keyframes pulse{50%{transform:scale(1.08);box-shadow:0 0 0 8px rgba(255,200,0,.45)}}
+#ring{position:fixed;z-index:5;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;border:6px solid #ffb300;box-shadow:0 0 0 6px rgba(255,255,255,.7),0 0 24px #ffd23f;pointer-events:none;animation:pulse 1s infinite}
+#ring.focus{border-color:#3fa7ff;box-shadow:0 0 0 6px rgba(255,255,255,.7);animation:none}
+#ring::after{content:"👆";position:absolute;left:58px;top:58px;font-size:34px}
+#ring.focus::after{content:""}
+#scrubBar{position:fixed;left:50%;bottom:122px;transform:translateX(-50%);z-index:6;width:min(70vw,320px);height:22px;border-radius:999px;background:#fff;border:3px solid #fff;box-shadow:0 4px 12px rgba(40,30,80,.2);overflow:hidden}
+#scrubBar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5cc97b,#3fa7ff);border-radius:999px;transition:width .15s}
+/* sticker book */
+#book{position:fixed;inset:0;z-index:8;overflow:auto;background:linear-gradient(#bfe6ff,#fff3d6);padding:14px 12px 30px}
+#book .in{max-width:980px;margin:0 auto}
+#book h1{margin:4px 0 2px;font-size:1.7rem;color:#2a2340;display:flex;align-items:center;gap:8px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:12px 0}
+.tile{position:relative;border:4px solid #fff;border-radius:28px;background:#fff;color:#2a2340;padding:10px 8px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:800;font-size:.95rem;box-shadow:0 6px 0 rgba(40,30,80,.15),0 8px 18px rgba(40,30,80,.15);min-height:150px}
+.tile .pic{width:92px;height:92px;border-radius:50%;background-size:cover;background-position:center;position:relative}
+.tile.done .pic::after{content:"";position:absolute;right:-8px;top:-6px;width:38px;height:38px;border-radius:50%;background:#ffd23f url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z' fill='%23fff'/%3E%3C/svg%3E") center/26px no-repeat;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.tile:not(.done) .pic{filter:saturate(.55) brightness(1.05)}
+.tile .n{position:absolute;left:10px;top:8px;font-size:.8rem;color:#8a83a3}
+.tile small{font-weight:600;color:#8a83a3;font-size:.75rem}
+.bookbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.bigbtn{font-size:1.15rem;font-weight:800;border-radius:999px;padding:14px 22px;border:4px solid #fff;background:var(--sun);color:#2a2340;box-shadow:0 5px 0 rgba(40,30,80,.18)}
+.bigbtn.go{background:#5cc97b;color:#073b17}
+.bigbtn.soft{background:#fff}
+.stk{display:flex;gap:6px;align-items:center;background:#fff;border-radius:999px;padding:6px 14px;font-weight:800;color:#2a2340}
+.parent{margin-top:14px;padding:12px 14px;border-radius:18px;background:#fff;border:2px dashed #c9bfe8;color:#2a2340;font-size:.9rem}
+.parent h3{margin:0 0 6px;font-size:1rem}
+.lmodal{text-align:center}
+.lmodal .stbig{width:150px;height:150px;margin:6px auto;border-radius:50%;background-size:cover;animation:pop .7s cubic-bezier(.2,1.6,.4,1) both;box-shadow:0 0 0 8px #ffd23f,0 8px 22px rgba(0,0,0,.25)}
+@keyframes pop{0%{transform:scale(.1) rotate(-30deg)}100%{transform:scale(1) rotate(0)}}
+.tip{margin:12px 0 4px;padding:12px 14px;border-radius:18px;background:#fff6d5;border:3px solid #ffd23f;text-align:left;color:#3a2c00}
+.tip b{display:block;margin-bottom:4px}
+.tip .rev{display:block;margin-top:6px;font-size:.8rem;color:#7a5a00}
+.mini{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:6px 0}.mini span{width:46px;height:46px;border-radius:50%;background-size:cover;display:inline-block;box-shadow:0 0 0 3px #ffd23f}
+.confetti{position:fixed;top:-20px;z-index:12;width:12px;height:18px;border-radius:3px;pointer-events:none;animation:fall 2.6s linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+@media (prefers-reduced-motion: reduce){.confetti{display:none}.card.hint,#ring{animation:none}}
+@media (max-width:600px){
+  #cards{left:96px;right:8px;bottom:10px;gap:8px}
+  .card{min-width:86px;min-height:96px;flex-basis:86px;font-size:.74rem;border-radius:22px}.card .e{font-size:38px}
+  #sayBtn{width:72px;height:72px;left:10px;bottom:16px}
+  .tiles{grid-template-columns:repeat(2,1fr);gap:10px}
+  .tile{min-height:138px}.tile .pic{width:80px;height:80px}
+  #book h1{font-size:1.35rem}
+  #topPill{top:16px;padding:6px 12px}#topPill .tt{display:none}
+}
+</style></head><body>
+<div id="loading">Loading…</div>
+<canvas id="game" aria-label="Little Stars play room"></canvas>
+<button id="homeBtn" class="lbtn hidden" title="Sticker book" aria-label="Sticker book">🏠</button>
+<button id="setBtn2" class="lbtn hidden" title="Settings" aria-label="Settings">⚙️</button>
+<div id="topPill" class="hidden"><span class="dots" id="dots"></span><span class="tt" id="sceneT"></span></div>
+<button id="sayBtn" class="lbtn hidden" title="Say it again" aria-label="Say it again">🔊<small>Again</small></button>
+<div id="cards" class="hidden"></div><div id="ring" class="hidden"></div>
+<div id="scrubBar" class="hidden"><i></i></div>
+<div id="toast"></div><div id="ovl"></div><div id="book" class="hidden"></div>
+<!--@@CDN@@-->
+<script>
+const K=0.05;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+
+/*@@COMMON@@*/
+/*@@ENGINE@@*/
+/*@@LITTLE@@*/
+</script></body></html>

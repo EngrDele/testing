@@ -66,6 +66,7 @@ async function run(browser, pkg, rec, expect) {
   try {
     await new Promise(r => setTimeout(r, 1000));
     await run(browser, 'site-life-kids-home', { game: 'home', name: 'Ada', role: 'Pupil', result: 'GOLD', stars: 14 }, { status: 'passed', score: 100 });
+    await run(browser, 'site-life-little', { game: 'little', name: 'Ada', role: 'Child 3-6', result: 'COMPLETE', stars: 5, scenes: ['hot'] }, { status: 'passed', score: 100 });
     await run(browser, 'site-life-factory', { game: 'factory', name: 'Ada Okafor', company: 'QA Ltd', result: 'REPLAY', score: 42.4 }, { status: 'failed', score: 42, removeFrame: true });
   } catch (e) { fail(e.stack || e.message); }
   await browser.close(); srv.kill();
