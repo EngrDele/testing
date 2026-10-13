@@ -11,8 +11,21 @@ const BASE = process.env.BASE_URL || 'file://' + ROOT + '/';
 const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'home', 'school'];
 const LANG = process.env.GAME_LANG || '';               // e.g. GAME_LANG=pcm to play in Pidgin
 const withLang = (u) => LANG ? u + (u.includes('?') ? '&' : '?') + 'lang=' + LANG : u;
-const MISSES = new Set();                               // untranslated on-screen strings (written to tests/out/)
-async function collectMisses(p) { if (LANG) (await p.evaluate(() => [...SL.misses])).forEach(x => MISSES.add(x)); }
+const MISSES = new Set(), RECHECKED = new Set();        // untranslated on-screen strings (written to tests/out/)
+// SL.misses also holds text that is already translated: the page's MutationObserver re-reads every node it has just
+// translated, and output with an emoji prefix or from a {0} pattern is not recognised as a translation. Split those out.
+async function collectMisses(p) {
+  if (!LANG) return;
+  const r = await p.evaluate(() => {
+    const d = (typeof SL_I18N !== 'undefined' && SL_I18N[SL.lang]) || {}, vals = new Set(Object.values(d));
+    const esc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pats = Object.entries(d).filter(([k]) => k.includes('{0}')).map(([, v]) => new RegExp('^' + v.split(/\{\d\}/).map(esc).join('(.+?)') + '$'));
+    const PREFIX = /^([\s\p{Extended_Pictographic}\p{S}\p{P}‍️]*?)([\p{L}"'(].*?)([\s.!?…:]*)$/su;
+    const isOut = x => { const m = x.match(PREFIX), forms = m ? [x, m[2] + m[3], m[2]] : [x]; return forms.some(f => vals.has(f) || pats.some(re => re.test(f))); };
+    const all = [...SL.misses]; return { miss: all.filter(x => !isOut(x)), done: all.filter(isOut) };
+  });
+  r.miss.forEach(x => MISSES.add(x)); r.done.forEach(x => RECHECKED.add(x));
+}
 const fail = (m) => { console.error('FAIL:', m); process.exitCode = 1; };
 
 async function page(browser, url) {
@@ -31,7 +44,7 @@ const step = (p, n, code) => p.evaluate(([n, code]) => { if (code) (new Function
 async function factory(browser) {
   const p = await page(browser, BASE + 'index.html');
   await p.fill('#nm', 'Test Player'); await p.fill('#co', 'QA Ltd'); await p.check('#slConsent'); await p.click('#spin'); await p.waitForTimeout(1500); await p.click('#start'); await p.waitForTimeout(300);
-  const okTexts = await p.evaluate(() => [...Object.values(SC), ...Object.values(EVENTS)].flatMap(s => s.o.filter(o => o.ok).map(o => o.t)));
+  const okTexts = await p.evaluate(() => [...Object.values(SC), ...Object.values(EVENTS)].flatMap(s => s.o.filter(o => o.ok).flatMap(o => [o.t, SL.t(o.t)])));   // English + translated (GAME_LANG)
   async function resolve() {
     for (let k = 0; k < 8; k++) {
       const bs = await p.$$('.modal [data-i]');
@@ -54,7 +67,8 @@ async function factory(browser) {
   const title = await p.$eval('.modal h1', e => e.innerText).catch(() => '');
   await collectMisses(p);
   console.log('factory', JSON.stringify(st), title);
-  if (!/passed/i.test(title) || st.zones !== st.of) fail('factory did not pass');
+  const passT = await p.evaluate(() => SL.t('Induction passed!'));
+  if (!(/passed/i.test(title) || title.includes(passT)) || st.zones !== st.of) fail('factory did not pass');
   if (p.errs.length) fail('factory errors: ' + p.errs.join(' | '));
   await p.close();
 }
@@ -62,7 +76,7 @@ async function factory(browser) {
 async function kids(browser, world) {
   const p = await page(browser, BASE + 'kids.html?world=' + world);
   await p.fill('#nm', 'Ada'); await p.check('#slConsent'); await p.click('#start'); await p.waitForTimeout(300);
-  const okT = await p.evaluate(() => MISS.filter(m => m.q).flatMap(m => m.q.o.filter(o => o.ok).map(o => o.t)));
+  const okT = await p.evaluate(() => MISS.filter(m => m.q).flatMap(m => m.q.o.filter(o => o.ok).flatMap(o => [o.t, SL.t(o.t)])));
   async function resolve() {
     for (let k = 0; k < 8; k++) {
       const bs = await p.$$('.modal [data-i]');
@@ -87,7 +101,8 @@ async function kids(browser, world) {
   const title = await p.$eval('.modal h1', e => e.innerText).catch(() => '');
   await collectMisses(p);
   console.log(world, JSON.stringify(st), title);
-  if (!/did it/i.test(title) || st.done !== st.of) fail(world + ' did not finish');
+  const winT = await p.evaluate(() => SL.t('You did it!'));
+  if (!(/did it/i.test(title) || title.includes(winT)) || st.done !== st.of) fail(world + ' did not finish');
   if (p.errs.length) fail(world + ' errors: ' + p.errs.join(' | '));
   await p.close();
 }
@@ -99,6 +114,6 @@ async function kids(browser, world) {
     for (const w of ['home', 'school']) if (want.includes(w)) await kids(browser, w);
   } catch (e) { fail(e.stack || e.message); }
   await browser.close();
-  if (LANG) { fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true }); fs.writeFileSync(path.join(__dirname, 'out', 'missing-' + LANG + '.json'), JSON.stringify([...MISSES].sort(), null, 1)); console.log('untranslated strings seen:', MISSES.size, '-> tests/out/missing-' + LANG + '.json'); }
+  if (LANG) { fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true }); fs.writeFileSync(path.join(__dirname, 'out', 'missing-' + LANG + '.json'), JSON.stringify([...MISSES].sort(), null, 1)); console.log('untranslated strings seen:', MISSES.size, '-> tests/out/missing-' + LANG + '.json', '(plus', RECHECKED.size, 'already-translated strings re-checked by the page)'); }
   console.log(process.exitCode ? 'SOME TESTS FAILED' : 'ALL PLAYTHROUGHS PASSED');
 })();
