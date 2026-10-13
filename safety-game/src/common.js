@@ -38,8 +38,15 @@ const SL = (() => {
     });
     VALUES[l] = new Set(Object.values(d));
   }
-  const PREFIX = /^([\s\p{Extended_Pictographic}\p{S}\p{P}‍️]*?)([\p{L}"'(].*?)([\s.!?…:]*)$/su;
+  const PREFIX = /^([\s\p{Extended_Pictographic}\p{S}\p{P}‍️]*?)((?!\p{Extended_Pictographic})[\p{L}"'(].*?)([\s.!?…:]*)$/su;
+  // OUT remembers what we produced, so text we already translated is not looked up (and reported missing) again
+  const OUT = new Set();
   function trText(s) {
+    if (lang === 'en' || !s) return s;
+    if (OUT.has(String(s).trim())) return s;
+    const r = trText0(s); if (r !== s) OUT.add(String(r).trim()); return r;
+  }
+  function trText0(s) {
     if (lang === 'en' || !s || !/\p{L}/u.test(s)) return s;
     const d = I18N[lang] || {}, core = s.trim();
     if (d[core] != null) return s.replace(core, d[core]);
@@ -50,7 +57,7 @@ const SL = (() => {
       if (d[body] != null) return s.replace(core, m[1] + d[body]);
       if (d[m[2]] != null) return s.replace(core, m[1] + d[m[2]] + m[3]);
     }
-    const sub = v => v.split(', ').map(x => { const d2 = I18N[lang] || {}; return d2[x] != null ? d2[x] : x; }).join(', ');
+    const sub = v => (I18N[lang] || {})[v] != null ? I18N[lang][v] : v.split(', ').map(x => { const d2 = I18N[lang] || {}; return d2[x] != null ? d2[x] : x; }).join(', ');
     for (const p of PAT[lang] || []) {
       const mm = core.match(p.re); if (mm) return s.replace(core, p.out.replace(/\{(\d)\}/g, (_, i) => sub(mm[+i + 1])));
       if (m) { const m2 = (m[2] + m[3]).match(p.re); if (m2) return s.replace(core, m[1] + p.out.replace(/\{(\d)\}/g, (_, i) => sub(m2[+i + 1]))); }
@@ -60,7 +67,7 @@ const SL = (() => {
   }
   function translateTree(root) {
     if (lang === 'en' || !root) return;
-    if (root.nodeType === 3) { const v = trText(root.data); if (v !== root.data) root.data = v; return; }
+    if (root.nodeType === 3) { if (root.parentElement && root.parentElement.closest('[data-notr],textarea')) return; const v = trText(root.data); if (v !== root.data) root.data = v; return; }
     if (root.nodeType !== 1 || root.closest && root.closest('[data-notr],script,style,textarea')) return;
     for (const a of ['placeholder', 'title', 'aria-label']) if (root.hasAttribute && root.hasAttribute(a)) root.setAttribute(a, trText(root.getAttribute(a)));
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
@@ -152,7 +159,7 @@ const SL = (() => {
   function caption(text, ms = 4500) {
     if (!settings.captions || !text) return;
     let el = document.getElementById('slCaption');
-    if (!el) { el = document.createElement('div'); el.id = 'slCaption'; document.body.appendChild(el); }
+    if (!el) { el = document.createElement('div'); el.id = 'slCaption'; el.setAttribute('data-notr', ''); document.body.appendChild(el); }
     el.textContent = text; el.classList.add('on'); clearTimeout(capTimer); capTimer = setTimeout(() => el.classList.remove('on'), ms);
   }
   function speak(text) {
