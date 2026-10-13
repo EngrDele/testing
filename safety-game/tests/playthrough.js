@@ -128,7 +128,7 @@ async function kids(browser, world) {
   if (SHOTS[world]) {
     fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true });
     const s0 = await p.evaluate(() => [S.p.x, S.p.y]);
-    for (const [i, [x, y, yw]] of SHOTS[world].entries()) { await step(p, 0, `S.p.x=${x};S.p.y=${y};yaw=${yw};`); await step(p, 0); await p.screenshot({ path: path.join(__dirname, 'out', `${world}-${i + 1}.png`) }); }
+    for (const [i, [x, y, yw]] of SHOTS[world].entries()) { await step(p, 0, `S.p.x=${x};S.p.y=${y};yaw=${yw};`); await step(p, 0); await p.screenshot({ path: path.join(__dirname, 'out', `${world}-${i + 1}.png`), timeout: 240000 }); }
     await step(p, 0, `S.p.x=${s0[0]};S.p.y=${s0[1]};yaw=0;`);
   }
   async function resolve() {
