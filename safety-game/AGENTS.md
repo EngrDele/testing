@@ -1,3 +1,3 @@
 # Agent instructions
 
-See CLAUDE.md in this folder: it is the guide for any AI agent or developer working on Site Life.
+Start with `docs/HANDOVER.md` (project history, status and direction), then `CLAUDE.md` (the technical guide for any AI agent or developer working on Site Life).
