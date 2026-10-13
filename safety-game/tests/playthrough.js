@@ -1,5 +1,5 @@
 // End-to-end playthrough of all three games in headless Chromium.
-// Usage (from safety-game/):  bash tests/setup.sh  &&  node tests/playthrough.js [factory|home|school ...]
+// Usage (from safety-game/):  bash tests/setup.sh  &&  node tests/playthrough.js [factory|home|school|market|water|online ...]
 // Env: BASE_URL (default file://.../index.html dir), HEADED=1 to watch.
 // The games are driven by calling update() directly: software WebGL in CI renders ~1 fps,
 // so waiting on requestAnimationFrame is far too slow (see CLAUDE.md "Testing").
@@ -8,7 +8,10 @@ let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromiu
 const ROOT = path.resolve(__dirname, '..');
 const VENDOR = path.join(__dirname, 'vendor');
 const BASE = process.env.BASE_URL || 'file://' + ROOT + '/';
-const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'home', 'school'];
+const KIDS = ['home', 'school', 'market', 'water', 'online'];
+const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', ...KIDS];
+// Screenshots of the newer kids worlds (player x, y, camera yaw), written to tests/out/<world>-<n>.png
+const SHOTS = { market: [[120, 500, -0.6], [700, 690, 0.4], [1060, 1060, -1.2]], water: [[150, 480, -0.7], [360, 810, 2.6], [1250, 790, 2.9]], online: [[600, 560, 0.3], [330, 320, 0.2], [700, 760, 2.8]] };
 const LANG = process.env.GAME_LANG || '';               // e.g. GAME_LANG=pcm to play in Pidgin
 const withLang = (u) => LANG ? u + (u.includes('?') ? '&' : '?') + 'lang=' + LANG : u;
 const MISSES = new Set();                               // untranslated on-screen strings (written to tests/out/)
@@ -60,9 +63,16 @@ async function factory(browser) {
 }
 
 async function kids(browser, world) {
-  const p = await page(browser, BASE + 'kids.html?world=' + world);
+  const p = await page(browser, BASE + 'kids.html?world=' + world + '&class=Test-Class_1');
   await p.fill('#nm', 'Ada'); await p.check('#slConsent'); await p.click('#start'); await p.waitForTimeout(300);
+  await p.evaluate(() => { const o = SL.post; SL.post = (x) => { window.__res = x; return o(x); }; });   // capture the posted result
   const okT = await p.evaluate(() => MISS.filter(m => m.q).flatMap(m => m.q.o.filter(o => o.ok).map(o => o.t)));
+  if (SHOTS[world]) {
+    fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true });
+    const s0 = await p.evaluate(() => [S.p.x, S.p.y]);
+    for (const [i, [x, y, yw]] of SHOTS[world].entries()) { await step(p, 0, `S.p.x=${x};S.p.y=${y};yaw=${yw};`); await step(p, 0); await p.screenshot({ path: path.join(__dirname, 'out', `${world}-${i + 1}.png`) }); }
+    await step(p, 0, `S.p.x=${s0[0]};S.p.y=${s0[1]};yaw=0;`);
+  }
   async function resolve() {
     for (let k = 0; k < 8; k++) {
       const bs = await p.$$('.modal [data-i]');
@@ -76,11 +86,11 @@ async function kids(browser, world) {
   const at = async (x, y) => { await resolve(); await step(p, 2, `S.p.x=${x};S.p.y=${y};`); await resolve(); };
   for (const [x, y] of await p.evaluate(() => S.items.map(i => [i.x, i.y]))) { await at(x, y); await p.evaluate(() => doAct()); await resolve(); }
   for (const [id, x, y] of await p.evaluate(() => MISS.map(m => [m.id, m.x, m.y]))) {
-    if (id === 'zebra') { await at(930, 880); continue; }
+    if (id === 'zebra') { const [zx, zy] = await p.evaluate(() => { const z = ZEBRAS[0]; return [(z.x1 + z.x2) / 2, (z.y1 + z.y2) / 2]; }); await at(zx, zy); continue; }
     if (id === 'board') for (let i = 0; i < 80 && !(await p.evaluate(() => S.bus.state === 'parked')); i++) await step(p, 5);
     await at(x, y);
   }
-  if (world === 'home') { for (let i = 0; i < 150 && !(await p.evaluate(() => S.over)); i++) await step(p, 5); }
+  if (world !== 'school') { for (let i = 0; i < 150 && !(await p.evaluate(() => S.over)); i++) await step(p, 5); }   // bus ride / end ride
   else { for (let i = 0; i < 12; i++) { await resolve(); if (await p.evaluate(() => !!S.drill)) break; await p.waitForTimeout(1000); } await resolve(); await step(p, 3, 'S.p.x=750;S.p.y=760;'); }
   await p.waitForTimeout(300);
   const st = await p.evaluate(() => ({ done: Object.keys(S.results).length, of: MISS.length, stars: S.stars, hearts: S.hearts, haz: S.hazFound + '/' + S.hazTotal }));
@@ -88,6 +98,14 @@ async function kids(browser, world) {
   await collectMisses(p);
   console.log(world, JSON.stringify(st), title);
   if (!/did it/i.test(title) || st.done !== st.of) fail(world + ' did not finish');
+  const res = await p.evaluate(() => window.__res || null);
+  if (!res) fail(world + ' posted no result');
+  else {
+    console.log('  result: class=' + res.class + ' zoneTimes=' + JSON.stringify(res.zoneTimes) + ' missed=' + JSON.stringify(res.missed));
+    if (res.class !== 'Test-Class1') fail(world + ' class code missing or not sanitised');
+    if (Object.keys(res.zoneTimes || {}).length !== st.of) fail(world + ' zoneTimes incomplete');
+    if (!Array.isArray(res.missed)) fail(world + ' missed list missing');
+  }
   if (p.errs.length) fail(world + ' errors: ' + p.errs.join(' | '));
   await p.close();
 }
@@ -96,7 +114,7 @@ async function kids(browser, world) {
   const browser = await chromium.launch({ headless: !process.env.HEADED, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
     if (want.includes('factory')) await factory(browser);
-    for (const w of ['home', 'school']) if (want.includes(w)) await kids(browser, w);
+    for (const w of KIDS) if (want.includes(w)) await kids(browser, w);
   } catch (e) { fail(e.stack || e.message); }
   await browser.close();
   if (LANG) { fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true }); fs.writeFileSync(path.join(__dirname, 'out', 'missing-' + LANG + '.json'), JSON.stringify([...MISSES].sort(), null, 1)); console.log('untranslated strings seen:', MISSES.size, '-> tests/out/missing-' + LANG + '.json'); }
