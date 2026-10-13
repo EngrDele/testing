@@ -71,7 +71,7 @@ const SLRoom = (() => {
   R.start = async (o) => {
     R.stop(); if (!R.code) return false; opts = o;
     try {
-      if (SL.onWeb) { await serverStart(); return true; }
+      if (SL.ownSite()) { await serverStart(); return true; }
       const room = (window.claude && window.claude.use) ? await window.claude.use('room') : null;
       if (room) { await artifactStart(room); return true; }
     } catch (e) { console.warn('Group session could not start', e); }

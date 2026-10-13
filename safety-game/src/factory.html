@@ -532,7 +532,8 @@ async function sendResult(rec){
     const [db,user]=await Promise.all([cap('db'),cap('user')]);
     const uid = user ? await user.id() : null;
     if(!SL.consent.ok()){ show('ℹ️ Your result was not sent because the privacy notice was not accepted.'); return; }
-    if(!db || !uid){ const r=await postServer(rec); show(r===true ? '✅ Your result has been sent to HSE.' : r==='queued' ? '📶 No connection. Your result will be sent to HSE automatically when you are back online.' : 'ℹ️ Use the WhatsApp or email button below to send your result to HSE.'); return; }
+    if(!db || !uid){ const r=await postServer(rec); show(r===true ? '✅ Your result has been sent to HSE.' : r==='queued' ? '📶 No connection. Your result will be sent to HSE automatically when you are back online.' : 'ℹ️ Use the WhatsApp or email button below to send your result to HSE.');
+      const link = r===true && rec.result==='PASS' && SL.certLink(SL.lastId); if(link && el()) el().insertAdjacentHTML('afterend', `<p><a class="btnlink" href="${link}" target="_blank" rel="noopener">🖨️ Print certificate</a></p>`); return; }
     const ref=db.doc('results/'+uid); const snap=await ref.get(); const old=snap.exists?snap.data():{};
     const attempts=[...(old.attempts||[]), rec].slice(-20);
     await ref.set({name:rec.name, role:rec.role, last:rec, attempts, passedEver: !!(old.passedEver || rec.result==='PASS'), updatedAt:Date.now()});
@@ -1006,7 +1007,7 @@ function render3D(dt){
   // player
   player.position.copy(P); player.rotation.y=p.face; animHuman(player,p.step,p.moving&&!paused,t);
   setPPE(player,p.ppe);
-  player.visible=!firstPerson;
+  player.visible=!firstPerson && !XR.active;
   // camera
   if(firstPerson){
     const bob = p.moving&&!paused ? Math.sin(p.step*2)*.03 : 0;
@@ -1085,13 +1086,13 @@ function drawHUD(){
 
 // ================== LOOP ==================
 let last=performance.now(), hudT=0, started=false;
-function loop(now){
+function loop(now){ if(!XR.active) tick(now); requestAnimationFrame(loop); }
+function tick(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   if(G && S){
     if(!started) renderIntro(now/1000);
     else { if(!paused) SL.fps.tick(dt); if(!paused && !S.over) update(dt); render3D(dt); hudT+=dt; if(hudT>0.12){hudT=0; drawHUD();} }
   }
-  requestAnimationFrame(loop);
 }
 
 // ================== INPUT ==================
@@ -1161,7 +1162,7 @@ function showStart(){
   const m=openModal(`<p class="muted" style="margin:0 0 6px;font-weight:700">Choose a game</p><div class="games"><a class="gcard ${GAME_ID==='factory'?'on':''}" href="index.html"><span class="gi">🏭</span><b>Factory Site Induction</b><small>Workers & visitors</small></a><a class="gcard ${GAME_ID==='factory-advanced'?'on':''}" href="index.html?course=advanced"><span class="gi">🧗🏾</span><b>Advanced Site Course</b><small>Height, confined space, hot work…</small></a><a class="gcard ${GAME_ID==='oga'?'on':''}" href="index.html?mode=oga"><span class="gi">🧔🏾</span><b>Oga Mode</b><small>Supervisors</small></a><a class="gcard" href="kids.html?world=home"><span class="gi">🏠🚌</span><b>Home → School Bus</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=school"><span class="gi">🏫</span><b>School Safety</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=market"><span class="gi">🛒</span><b>Market & Road Trip</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=water"><span class="gi">🏖️</span><b>Beach & Pool</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=online"><span class="gi">📱</span><b>Online Safety</b><small>Kids 8–14</small></a></div><h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
     ${MODE==='oga'?`<div class="fb"><b>🧔🏾 Oga Mode.</b> You are the supervisor today. Workers will start doing unsafe things around the compound. Get there fast and stop them. Stop at least ${SITE.oga.pass} of ${SITE.oga.incidents.length} to pass.</div>`:COURSE?`<div class="fb"><b>🧗🏾 ${esc(COURSE.title)}.</b> ${esc(COURSE.about)}</div>`:''}
     <p class="muted">The safety induction you <b>play</b>, not a paper you tick. Walk the compound, make the right calls, spot the hazards, and survive your first shift.<br>${SITE._custom?'Site':'Demo site'}: <i>${esc(SITE.name||'')}</i>.</p>
-    <p><b>Your name</b></p><input id="nm" placeholder="e.g. Tunde Bakare" maxlength="40" value="${esc(profile.name)}">
+    <p><b>Your name</b></p><input id="nm" placeholder="e.g. Tunde Bakare" maxlength="40" value="${esc(profile.name || SL.lms.studentName())}">
     <p><b>Company</b> <span class="muted">(optional)</span></p><input id="co" placeholder="e.g. ABC Contractors Ltd" maxlength="60" value="${esc(profile.company)}">
     <p><b>Your character</b></p>
     <div class="row" id="sex"><button data-x="m" class="${profile.sex==='m'?'primary':''}">👨🏾 Man</button><button data-x="f" class="${profile.sex==='f'?'primary':''}">👩🏾 Woman</button></div>
@@ -1202,6 +1203,10 @@ window.addEventListener('load',()=>{
   try{ newGame(); initThree(); }catch(err){ $('loading').innerHTML='Your device could not start 3D. Try the <a href="lite.html">2D version</a>.'; console.error(err); return; }
   $('loading').remove();
   showStart();
+  // VR headsets (WebXR): teleport by pointing; questions appear as panels (src/engine.js XR)
+  XR.setup(G.renderer, G.scene, G.camera, { frame: tick, getPlayer: () => S.p, getYaw: () => yaw,
+    onTeleport: (x, y) => { if (!started || paused || S.over || x < 0 || y < 0 || x > W || y > H || blocked(x, y, 12, solids())) return;
+      S.p.x = x; S.p.y = y; setTimeout(() => { if (XR.active && S.near && !paused) doAct(); }, 400); } });
   requestAnimationFrame(loop);
 });
 </script>

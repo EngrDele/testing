@@ -50,7 +50,9 @@ if len(sys.argv) >= 3:
     three = open(sys.argv[1], encoding='utf8').read().replace('</script', '<\\/script')
     sky = open(sys.argv[2], encoding='utf8').read()
     inline = f"<script>/* three.js r128 (MIT License) */\n{three}\n</script>\n<script>/* three.js Sky (MIT License) */\n{sky}\n</script>"
-    off = lambda s: s.replace(CDN, inline)
+    # SL_OFFLINE_FILE: common.js then skips the service worker, manifest and /api/result (the file may be
+    # opened from WhatsApp, a USB stick or an LMS package, not from our server)
+    off = lambda s: s.replace(CDN, inline).replace('const SL_I18N = ', 'var SL_OFFLINE_FILE = true;\nconst SL_I18N = ', 1)
     wr('site-life-offline.html', off(idx).replace('href="kids.html?world=', 'href="kids-offline.html?world=').replace('href="index.html', 'href="site-life-offline.html').replace('<title>Site Life 3D</title>', '<title>Site Life 3D (offline)</title>'))
     wr('kids-offline.html', off(kids).replace('href="index.html', 'href="site-life-offline.html'))
     print('built offline files')

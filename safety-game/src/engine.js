@@ -305,7 +305,7 @@ function makeHuman(o){
   // reflective bands on coveralls
   if(o.outfit==='coverall'){ const ref=std('#d6dade',{r:.25,m:.7}); for(const L of legs){ const b=mesh(new THREE.TorusGeometry(.058,.008,6,20),ref,0,-.2,0); b.rotation.x=Math.PI/2; L.kn.add(b);} for(const A of arms){ const b=mesh(new THREE.TorusGeometry(.046,.008,6,20),ref,0,-.12,0); b.rotation.x=Math.PI/2; A.el.add(b);} }
   if(o.label){ const l=labelSprite(o.label); l.position.y=2.2; g.add(l); g.userData.label=l; }
-  const blob=new THREE.Mesh(new THREE.PlaneGeometry(.95,.95),new THREE.MeshBasicMaterial({map:BLOB,transparent:true,depthWrite:false})); blob.rotation.x=-Math.PI/2; blob.position.y=.015; blob.userData.keep=true; g.add(blob);
+  const blob=new THREE.Mesh(new THREE.PlaneGeometry(.95,.95),new THREE.MeshBasicMaterial({map:BLOB,transparent:true,depthWrite:false})); blob.rotation.x=-Math.PI/2; blob.position.y=.015; blob.userData.keep=true; blob.userData.blob=true; g.add(blob);
   if(female) g.scale.setScalar(.955); if(o.height) g.scale.multiplyScalar(o.height);
   torso.userData.keep=true;
   g.traverse(m=>{ if(m.isMesh && m!==blob) m.castShadow=true; });
@@ -322,7 +322,8 @@ function setPPE(g,p){
   if(p.muffs && p.hat){ u.ppe.muffs.position.y=0; }
 }
 function animHuman(g,step,moving,t,seated){
-  const u=g.userData; if(!u.legs) return;
+  const u=g.userData; if(u.gltf){ animGLTF(u,moving&&!seated,t); return; }
+  if(!u.legs) return;
   if(seated){ u.legs.forEach(l=>{l.hp.rotation.x=1.45; l.kn.rotation.x=-1.45;}); u.arms.forEach(a=>{a.sh.rotation.x=.9; a.el.rotation.x=.35;}); return; }
   const s=step, a=moving? Math.sin(s):0;
   u.legs[0].hp.rotation.x= a*.42; u.legs[1].hp.rotation.x=-a*.42;
@@ -413,3 +414,241 @@ function makeProp(kind){
   return propLabel(g);
 }
 
+
+// ---------- glTF models (ROADMAP 12/13): rigged avatars and scanned client buildings ----------
+// Everything here is optional and lazy: nothing is fetched unless a glTF URL is given (opts.gltf,
+// a global SL_AVATAR_URL, or placeSiteModel). On any failure (offline, blocked CDN, bad file) it
+// logs one warning per URL and keeps the procedural fallback.
+const GLTF_LIB='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+const GLTF_SKEL='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js';
+const _gltf={cache:{}, scripts:{}, warned:new Set(), loader:null};
+function loadScriptOnce(src){
+  return _gltf.scripts[src] || (_gltf.scripts[src]=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.async=true; s.onload=res; s.onerror=()=>rej(new Error('could not load '+src)); document.head.appendChild(s); }));
+}
+function gltfWarn(url,e){ if(_gltf.warned.has(url)) return; _gltf.warned.add(url); console.warn('Site Life: glTF '+url+' not loaded, using the built-in model ('+((e&&e.message)||e)+')'); }
+// Resolves the loaded glTF scene (with .animations); the same object for every call with that URL, so clone it to place it twice.
+function loadGLTF(url){
+  if(_gltf.cache[url]) return _gltf.cache[url];
+  const p=(async()=>{
+    if(!window.THREE) throw new Error('three.js missing');
+    if(navigator.onLine===false && !/^(blob|data):/.test(url)) throw new Error('offline');
+    if(!THREE.GLTFLoader) await loadScriptOnce(GLTF_LIB);
+    if(!_gltf.loader) _gltf.loader=new THREE.GLTFLoader();
+    const g=await new Promise((res,rej)=>_gltf.loader.load(url,res,undefined,rej));
+    g.scene.animations=g.animations||[]; return g.scene;
+  })();
+  p.catch(e=>gltfWarn(url,e)); // stays cached as failed: one warning, no retry storm
+  return (_gltf.cache[url]=p);
+}
+// Copy a loaded glTF scene; skinned (rigged) models need SkeletonUtils so each copy has its own skeleton.
+async function cloneGLTF(src){
+  let skinned=false; src.traverse(o=>{ if(o.isSkinnedMesh) skinned=true; });
+  if(skinned && !THREE.SkeletonUtils) { try{ await loadScriptOnce(GLTF_SKEL); }catch(e){} }
+  const c=(skinned && THREE.SkeletonUtils)? THREE.SkeletonUtils.clone(src) : src.clone(true);
+  c.animations=src.animations||[]; return c;
+}
+// makeHuman() now, swapped for the glTF avatar (opts.gltf or SL_AVATAR_URL) when it loads.
+// Extra opts: gltf (URL), gltfHeight (m, default 1.75), gltfFacing ('+z' default glTF convention, or '-z').
+function makeHumanGLTF(o={}){
+  const g=makeHuman(o);
+  const url=o.gltf || (typeof window!=='undefined' && window.SL_AVATAR_URL) || '';
+  if(!url) return g;
+  loadGLTF(url).then(cloneGLTF).then(model=>{
+    const box=new THREE.Box3().setFromObject(model), h=(box.max.y-box.min.y)||1, s=(o.gltfHeight||1.75)/h;
+    const holder=new THREE.Group(); holder.add(model); holder.scale.setScalar(s); holder.position.y=-box.min.y*s;
+    if(o.gltfFacing!=='-z') holder.rotation.y=Math.PI; // glTF faces +Z; our people face -Z
+    model.traverse(m=>{ if(m.isMesh){ m.castShadow=true; m.receiveShadow=true; m.frustumCulled=false; } });
+    const u=g.userData;
+    g.children.forEach(ch=>{ if(!(ch===u.label || (ch.userData&&ch.userData.blob))) ch.visible=false; });
+    g.add(holder); u.gltf=holder;
+    const clips=model.animations||[];
+    if(clips.length){
+      const mixer=new THREE.AnimationMixer(model), find=re=>clips.find(c=>re.test(c.name));
+      const idle=find(/idle|stand|breath/i)||clips[0], walk=find(/walk/i)||find(/run/i);
+      u.mixer=mixer; u.gltfActs={idle:mixer.clipAction(idle), walk:walk?mixer.clipAction(walk):null};
+      u.gltfActs.idle.play(); u._act='idle';
+    }
+  }).catch(()=>{}); // warned in loadGLTF; procedural body stays
+  return g;
+}
+function animGLTF(u,moving,t){
+  if(!u.mixer) return;
+  const dt=u._t==null?0:Math.min(.1,Math.max(0,t-u._t)); u._t=t;
+  const want=moving&&u.gltfActs.walk?'walk':'idle';
+  if(want!==u._act){ const from=u.gltfActs[u._act], to=u.gltfActs[want]; to.reset().play(); if(from) from.crossFadeTo(to,.25,false); u._act=want; }
+  u.mixer.update(dt);
+}
+// Drop a scanned building (e.g. a Polycam glTF/GLB export) into the world at map coordinates.
+// opts: x, y (map units), rot (radians about Y), scale (default 1), elev (m, default 0). Resolves the model, or null on failure.
+// Collision is still the game's 2D solids: add a rectangle there for walls the player must not walk through.
+function placeSiteModel(scene,url,o={}){
+  return loadGLTF(url).then(cloneGLTF).then(m=>{
+    m.position.set(X(o.x||0),o.elev||0,Z(o.y||0)); m.rotation.y=o.rot||0; m.scale.setScalar(o.scale||1);
+    m.traverse(c=>{ if(c.isMesh){ c.castShadow=true; c.receiveShadow=true; } });
+    scene.add(m); return m;
+  }).catch(()=>null);
+}
+
+// ---------- WebXR VR mode (ROADMAP 14) ----------
+// XR.setup(renderer, scene, camera, opts) shows a "🥽 Enter VR" button only when the browser has an
+// immersive-vr device; otherwise it does nothing else (no objects, no listeners).
+// opts: frame(t)       one game frame (update + render3D); called from renderer.setAnimationLoop in VR.
+//                      Without it XR renders scene/camera itself.
+//       getPlayer()    -> {x, y} map position; the VR viewpoint (rig) follows it.
+//       getYaw()       -> camera yaw when entering VR (0 = north / -Z).
+//       onTeleport(x,y) map position the user pointed at on the floor (trigger, or flick the thumbstick forward).
+//       interactive    array of meshes/groups the controller can select; onSelect(obj, hit) is called.
+//       modalRoot      element holding the game's DOM modals (default #ovl): while in VR every open modal is
+//                      mirrored as a 3D panel and the chosen button is clicked. Set mirror:false to turn off.
+//       onStart(), onEnd()
+// XR.showPanel(title, options[], cb(index), {text}) shows a question panel in front of the user.
+const XR=(()=>{
+  const st={active:false, supported:false, interactive:[]};
+  let R=null, SC=null, CAM=null, O={}, btn=null, session=null, rig=null, ctrls=[], panel=null, marker=null, mo=null, moT=0, ray=null, tmpM=null, lastSig='';
+  function setup(renderer,scene,camera,opts={}){
+    R=renderer; SC=scene; CAM=camera; O=opts;
+    if(!navigator.xr || typeof navigator.xr.isSessionSupported!=='function') return Promise.resolve(false);
+    return navigator.xr.isSessionSupported('immersive-vr').then(ok=>{ st.supported=!!ok; if(ok) addButton(); return !!ok; }).catch(()=>false);
+  }
+  function addButton(){
+    if(btn) return;
+    btn=document.createElement('button'); btn.id='xrBtn'; btn.className='fbtn'; btn.textContent='🥽 Enter VR';
+    btn.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:30;padding:8px 14px;font-weight:700;border-radius:999px';
+    btn.onclick=()=>{ session? session.end() : enter().catch(e=>console.warn('Site Life: VR could not start',e)); };
+    (O.buttonParent||document.body).appendChild(btn);
+  }
+  async function enter(){
+    const sess=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor','bounded-floor']});
+    R.xr.enabled=true; R.xr.setReferenceSpaceType('local-floor');
+    try{ await R.xr.setSession(sess); }catch(e){ R.xr.enabled=false; sess.end().catch(()=>{}); throw e; }
+    session=sess; st.active=true; btn&&(btn.textContent='Exit VR');
+    ray=new THREE.Raycaster(); tmpM=new THREE.Matrix4();
+    rig=new THREE.Group(); rig.rotation.y=O.getYaw?O.getYaw():0; SC.add(rig); rig.add(CAM); CAM.position.set(0,0,0); CAM.rotation.set(0,0,0);
+    marker=new THREE.Mesh(new THREE.RingGeometry(.22,.3,32),new THREE.MeshBasicMaterial({color:0x22e07a,transparent:true,opacity:.85,depthWrite:false,toneMapped:false}));
+    marker.rotation.x=-Math.PI/2; marker.visible=false; SC.add(marker);
+    ctrls=[0,1].map(i=>{
+      const c=R.xr.getController(i);
+      const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-1)]),new THREE.LineBasicMaterial({color:0xffffff,toneMapped:false}));
+      line.scale.z=5; c.add(line); c.userData.line=line; c.userData.lock={turn:false,tele:false};
+      if(!c.userData.slBound){ c.userData.slBound=true; // getController returns the same object every session
+        c.addEventListener('connected',e=>{ c.userData.src=e.data; });
+        c.addEventListener('disconnected',()=>{ c.userData.src=null; });
+        c.addEventListener('select',()=>{ if(st.active) select(c); }); }
+      rig.add(c); return c;
+    });
+    sess.addEventListener('end',onEnd);
+    R.setAnimationLoop(frame);
+    watchModals();
+    O.onStart&&O.onStart();
+  }
+  function onEnd(){
+    st.active=false; session=null; R.setAnimationLoop(null);
+    if(mo){ mo.disconnect(); mo=null; } hidePanel();
+    ctrls.forEach(c=>{ const l=c.userData.line; if(l){ c.remove(l); l.geometry.dispose(); } });
+    if(rig){ rig.remove(CAM); ctrls.forEach(c=>rig.remove(c)); SC.remove(rig); rig=null; }
+    if(marker){ SC.remove(marker); marker.geometry.dispose(); marker=null; }
+    ctrls=[]; R.xr.enabled=false; CAM.updateProjectionMatrix(); btn&&(btn.textContent='🥽 Enter VR');
+    O.onEnd&&O.onEnd();
+  }
+  function aim(c){ tmpM.identity().extractRotation(c.matrixWorld); ray.ray.origin.setFromMatrixPosition(c.matrixWorld); ray.ray.direction.set(0,0,-1).applyMatrix4(tmpM); return ray; }
+  function floorHit(c){ const p=new THREE.Vector3(); const r=aim(c).ray; if(r.direction.y>-.05) return null; if(!r.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),p)) return null; return p.distanceTo(r.origin)<30?p:null; }
+  function panelHit(c){
+    if(!panel) return null;
+    const h=aim(c).intersectObject(panel.mesh,false)[0]; if(!h||!h.uv) return null;
+    const px=h.uv.x*panel.W, py=(1-h.uv.y)*panel.H;
+    const i=panel.rects.findIndex(r=>px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h);
+    return {i,dist:h.distance};
+  }
+  function select(c){
+    const ph=panelHit(c);
+    if(ph){ if(ph.i>=0){ const cb=panel.cb; hidePanel(); cb&&cb(ph.i); } return; }
+    if(panel) return; // a question is open: ignore the world
+    const list=st.interactive.concat(O.interactive||[]);
+    if(list.length){
+      const h=aim(c).intersectObjects(list,true)[0];
+      if(h){ let o=h.object; while(o&&!list.includes(o)) o=o.parent; O.onSelect&&O.onSelect(o||h.object,h); return; }
+    }
+    teleportFrom(c);
+  }
+  function teleportFrom(c){ const p=floorHit(c); if(p&&O.onTeleport) O.onTeleport(p.x/K,p.z/K); }
+  function frame(t){
+    const p=O.getPlayer&&O.getPlayer(); if(p&&rig) rig.position.set(X(p.x),0,Z(p.y));
+    if(O.frame) O.frame(t); else R.render(SC,CAM);
+    pointers();
+  }
+  function pointers(){
+    let showMarker=false;
+    for(const c of ctrls){
+      const ph=panelHit(c), line=c.userData.line;
+      if(ph){ line.scale.z=ph.dist; if(ph.i!==panel.hover){ panel.hover=ph.i; drawPanel(); } continue; }
+      const fp=!panel?floorHit(c):null;
+      line.scale.z=fp?fp.distanceTo(ray.ray.origin):5;
+      if(fp&&marker){ marker.position.set(fp.x,.03,fp.z); showMarker=true; }
+      // thumbstick: flick forward = teleport to the pointed spot, left/right = snap turn 30°
+      const gp=c.userData.src&&c.userData.src.gamepad; if(!gp||!gp.axes) continue;
+      const ax=gp.axes.length>=4?gp.axes[2]:gp.axes[0]||0, ay=gp.axes.length>=4?gp.axes[3]:gp.axes[1]||0, L=c.userData.lock;
+      if(Math.abs(ax)>.7&&!L.turn){ L.turn=true; rig.rotation.y-=Math.sign(ax)*Math.PI/6; } else if(Math.abs(ax)<.3) L.turn=false;
+      if(ay<-.7&&!L.tele){ L.tele=true; if(!panel) teleportFrom(c); } else if(ay>-.3) L.tele=false;
+    }
+    if(marker) marker.visible=showMarker;
+  }
+  // ----- question panels (canvas texture, no DOM) -----
+  function wrap(c,text,maxW){ const out=[]; for(const para of String(text).split('\n')){ let line=''; for(const w of para.split(/\s+/)){ const t2=line?line+' '+w:w; if(c.measureText(t2).width>maxW&&line){ out.push(line); line=w; } else line=t2; } out.push(line); } return out; }
+  function layout(){
+    const W=1024, pad=40, c=document.createElement('canvas').getContext('2d'), P=panel, rows=[];
+    let y=pad;
+    c.font='bold 46px system-ui,sans-serif'; for(const l of wrap(c,P.title,W-pad*2)){ rows.push({t:l,y:y+46,f:c.font,col:'#ffffff'}); y+=56; }
+    if(P.text){ y+=8; c.font='32px system-ui,sans-serif'; for(const l of wrap(c,P.text,W-pad*2).slice(0,9)){ rows.push({t:l,y:y+32,f:c.font,col:'#dfe7ec'}); y+=42; } }
+    y+=16; P.rects=[]; c.font='bold 34px system-ui,sans-serif';
+    P.options.forEach((o,i)=>{ const ls=wrap(c,(i+1)+'. '+o,W-pad*2-40).slice(0,3), h=ls.length*42+28; P.rects.push({x:pad,y,w:W-pad*2,h,ls}); y+=h+14; });
+    P.W=W; P.H=Math.ceil(y+pad-14); P.rows=rows;
+  }
+  function drawPanel(){
+    const P=panel, cv=P.canvas; cv.width=P.W; cv.height=P.H; const c=cv.getContext('2d');
+    c.fillStyle='rgba(16,26,32,.94)'; rr(c,0,0,P.W,P.H,36); c.fill(); c.strokeStyle='#0f7a4f'; c.lineWidth=8; rr(c,4,4,P.W-8,P.H-8,32); c.stroke();
+    for(const r of P.rows){ c.font=r.f; c.fillStyle=r.col; c.fillText(r.t,40,r.y); }
+    c.font='bold 34px system-ui,sans-serif';
+    P.rects.forEach((r,i)=>{ c.fillStyle=i===P.hover?'#ffd400':'#2b3b45'; rr(c,r.x,r.y,r.w,r.h,18); c.fill(); c.fillStyle=i===P.hover?'#1d1f22':'#ffffff'; r.ls.forEach((l,k)=>c.fillText(l,r.x+20,r.y+14+34+k*42)); });
+    P.tex.needsUpdate=true;
+  }
+  function rr(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+  function showPanel(title,options,cb,o={}){
+    if(!st.active) return null;
+    hidePanel();
+    const canvas=document.createElement('canvas'), tx=new THREE.CanvasTexture(canvas); tx.encoding=THREE.sRGBEncoding;
+    panel={title:String(title||''),text:o.text||'',options:(options||[]).map(String),cb,hover:-1,canvas,tex:tx};
+    layout(); drawPanel();
+    const w=1.3, h=w*panel.H/panel.W;
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tx,transparent:true,depthTest:false,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));
+    m.renderOrder=999; panel.mesh=m;
+    // 1.4 m in front of the head, at eye height, facing the user
+    const head=new THREE.Vector3(), dir=new THREE.Vector3(); CAM.getWorldPosition(head); CAM.getWorldDirection(dir); dir.y=0; if(dir.lengthSq()<1e-4) dir.set(0,0,-1); dir.normalize();
+    m.position.copy(head).addScaledVector(dir,1.4); m.position.y=Math.max(.9,head.y-.05); m.lookAt(head.x,m.position.y,head.z);
+    SC.add(m);
+    return {close:hidePanel};
+  }
+  function hidePanel(){ if(!panel) return; SC&&SC.remove(panel.mesh); panel.mesh.geometry.dispose(); panel.mesh.material.dispose(); panel.tex.dispose(); panel=null; lastSig=''; }
+  // ----- mirror the game's DOM modals as panels while in VR -----
+  function watchModals(){
+    if(O.mirror===false) return;
+    const root=O.modalRoot||document.getElementById('ovl'); if(!root) return;
+    mo=new MutationObserver(()=>{ clearTimeout(moT); moT=setTimeout(()=>mirror(root),60); });
+    mo.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','class']});
+    mirror(root);
+  }
+  function mirror(root){
+    if(!st.active) return;
+    const m=root.querySelector('.modal');
+    if(!m){ if(panel&&panel.mirrored) hidePanel(); return; }
+    const btns=[...m.querySelectorAll('button:not([disabled]), a.btnlink')].filter(b=>b.getClientRects().length && (b.textContent||'').trim()).slice(0,8); // colour swatches etc. have no text
+    const title=((m.querySelector('h1,h2')||{}).textContent||'').trim();
+    const fb=m.querySelector('#fb .fb'), p=m.querySelector('p.qt')||[...m.querySelectorAll('p')].find(x=>!x.classList.contains('muted'));
+    const text=[p&&p.textContent.trim(), fb&&fb.textContent.trim()].filter(Boolean).join('\n').slice(0,420);
+    const labels=btns.map(b=>b.textContent.trim());
+    const sig=title+'|'+text+'|'+labels.join('|');
+    if(sig===lastSig) return;
+    showPanel(title,labels,i=>{ const b=btns[i]; if(b&&b.isConnected) b.click(); },{text});
+    if(panel){ panel.mirrored=true; lastSig=sig; }
+  }
+  return { setup, showPanel, hidePanel, enter, get active(){ return st.active; }, get supported(){ return st.supported; }, interactive:st.interactive, _mirror:mirror };
+})();
