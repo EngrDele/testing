@@ -14,7 +14,7 @@ rd = lambda p: open(os.path.join(here, p), encoding='utf8').read()
 def wr(p, s): open(os.path.join(root, p), 'w', encoding='utf8').write(s)
 
 import json, glob
-engine, common = rd('engine.js'), rd('common.js')
+engine, common = rd('engine.js'), rd('common.js') + '\n' + rd('room.js')
 # Translations: src/i18n/<lang>.json (keys are the English strings). strings-en.json is the source list, not a language.
 i18n = {}
 for f in sorted(glob.glob(os.path.join(here, 'i18n', '*.json'))):

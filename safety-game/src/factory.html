@@ -63,6 +63,7 @@ input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);
 .ppe-grid button.on{border:2px solid var(--brand);background:color-mix(in srgb,var(--brand) 14%,var(--chip))}
 #muteBtn{left:12px;bottom:22px;opacity:.9}
 #setBtn{left:66px;bottom:22px;opacity:.9}
+#roomBtn{left:118px;bottom:22px;font-size:13px}
 html{font-size:calc(15px * var(--fs,1))}
 body,.modal,button,input{font-size:1rem}
 input[type=checkbox]{width:auto;margin-right:6px;vertical-align:middle}
@@ -129,6 +130,7 @@ table{width:100%;border-collapse:collapse;font-size:.82rem}td,th{border-bottom:1
 <div id="guidePanel" class="hidden"><span id="gArrow">⬆</span><span id="gText"></span></div>
 <button id="muteBtn" class="fbtn hidden">🔊</button>
 <button id="setBtn" class="fbtn hidden" title="Settings">⚙️</button>
+<button id="roomBtn" class="fbtn hidden">🎓 Trainer</button>
 <div id="timer" class="hidden"></div>
 <div id="alarmv" class="alarmv hidden"></div>
 <div id="ovl"></div>
@@ -1054,6 +1056,7 @@ function render3D(dt){
   } else { G.arrows.count=0; G.beam.visible=false; }
   G.escort.visible=!!(guideOn && gd && gd.esc && started);
   if(G.escort.visible){ const e=gd.esc; G.escort.position.set(X(e.x),0,Z(e.y)); G.escort.rotation.y=e.face; animHuman(G.escort,e.step,e.moving,t); }
+  SLRoom.render(scene,t);
   G.renderer.render(scene,camera);
 }
 function renderIntro(t){
@@ -1067,7 +1070,7 @@ function renderIntro(t){
 function drawHUD(){
   $('bars').innerHTML = BARS.map(b=>{const v=S.bars[b.k]; return `<div class="b ${v<5?'low':''}" title="${b.l}">${b.n} ${Math.ceil(v)}<div class="t"><div class="f" style="width:${v*10}%"></div></div></div>`}).join('');
   const mins = 8*60 + Math.floor(S.t); const hh=String(Math.floor(mins/60)%24).padStart(2,'0'), mm=String(mins%60).padStart(2,'0');
-  $('info').innerHTML = `<span>🕗 ${hh}:${mm}</span>${S.oga?`<span>🧔🏾 ${S.oga.log.filter(l=>l.ok).length}/${SITE.oga.incidents.length}</span><span>⚠️ ${S.oga.active.length}</span>`:`<span>✅ ${Object.keys(S.results).length}/${ZONES.length}</span><span>🔎 ${S.hazFound}/${S.hazTotal}</span>`}${PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join('')?'<span>PPE: '+PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join(' ')+'</span>':''}`;
+  $('info').innerHTML = `<span>🕗 ${hh}:${mm}</span>${SLRoom.backend?`<span>👥 ${SLRoom.players.length+1}</span>`:''}${S.oga?`<span>🧔🏾 ${S.oga.log.filter(l=>l.ok).length}/${SITE.oga.incidents.length}</span><span>⚠️ ${S.oga.active.length}</span>`:`<span>✅ ${Object.keys(S.results).length}/${ZONES.length}</span><span>🔎 ${S.hazFound}/${S.hazTotal}</span>`}${PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join('')?'<span>PPE: '+PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join(' ')+'</span>':''}`;
   const m=$('mini'), c=m.getContext('2d'), sx=m.width/W, sy=m.height/H;
   c.fillStyle='#cfcabd'; c.fillRect(0,0,m.width,m.height);
   c.fillStyle='#5d5e61'; c.fillRect(LANE.x1*sx,LANE.y1*sy,(LANE.x2-LANE.x1)*sx,(LANE.y2-LANE.y1)*sy); c.fillRect(80*sx,60*sy,160*sx,(FENCE.b-60)*sy);
@@ -1125,10 +1128,34 @@ $('guideBtn').onclick=()=>{ guideOn=!guideOn; guidePick=null; $('guideBtn').text
 $('autoBtn').onclick=()=>{ autoQ=!autoQ; $('autoBtn').textContent='⚡ Auto: '+(autoQ?'ON':'OFF'); toast(autoQ?'⚡ Questions now pop up automatically when you reach a place.':'Auto off. Press the green button to talk.'); };
 $('muteBtn').onclick=()=>{ muted=!muted; $('muteBtn').textContent=muted?'🔇':'🔊'; };
 $('setBtn').onclick=()=>{ if(!paused) openSettings(); };
+$('roomBtn').onclick=()=>{ if(!paused) openTrainer(); };
 function openSettings(after){ SL.openSettings(openModal, ()=>{ closeModal(); after&&after(); }, k=>{ if(k==='lang'){ const u=new URL(location.href); if(u.searchParams.has('lang')){ u.searchParams.set('lang',SL.lang); location.href=u.href; } else location.reload(); } if(k==='quality') applyQuality(); if(k==='cb') applyMarkerColor(); }); }
 
 // ================== START ==================
-function setHud(on){ ['hud','act','phoneBtn','camBtn','autoBtn','guideBtn','muteBtn','setBtn','hint'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){$('guidePanel').classList.add('hidden');$('prompt').classList.add('hidden');$('timer').classList.add('hidden');$('alarmv').classList.add('hidden');} }
+// ---------- group session (src/room.js) ----------
+async function startRoom(code){
+  SLRoom.stop(); if(!SLRoom.setCode(code)) return;
+  const ok=await SLRoom.start({name:profile.name, game:GAME_ID, state:()=>({x:S.p.x, y:S.p.y, yaw:S.p.face, zone:(S.guide&&S.guide.target&&S.guide.target.name)||'', score:Object.values(S.results).filter(v=>v===true).length}), onEvent:roomEvent});
+  toast(ok?`👥 Group session ${SLRoom.code}: you can see the other players.`:'👥 Group sessions need the results server or the claude.ai link. Playing solo.', ok?'':'warn');
+  $('roomBtn').classList.toggle('hidden', !(ok && SLRoom.isTrainer));
+}
+function roomEvent(type){
+  if(!S||S.over) return;
+  toast('🎓 Trainer: '+tr(SLRoom.eventName(type)),'warn');
+  if(type==='fire_alarm' && !S.alarm) startAlarm();
+  if(type==='nepa'||type==='rain') fireEvent(type);
+  if(type==='spill'){ const sp=SC.spill||(SITE.courses&&SITE.courses.advanced&&SITE.courses.advanced.scenarios.spill); if(sp){ const go=()=>{ if(paused) return setTimeout(go,1000); scenario(sp,'Chemical spill (trainer)'); }; go(); } }
+  if(type==='end') endGame();
+}
+function openTrainer(){
+  const m=openModal(`<h2>🎓 Trainer · group ${esc(SLRoom.code)}</h2><p class="muted">Set off an event for everyone in this group.</p>
+    <div class="opts">${SLRoom.EVENTS.map(e=>`<button data-ev="${e}">${esc(SLRoom.eventName(e))}</button>`).join('')}</div>
+    <h2 style="margin-top:12px">Players (${SLRoom.players.length})</h2><ul class="tasks">${SLRoom.players.map(p=>`<li><span>${p.role==='trainer'?'🎓':'👷🏾'}</span><span style="flex:1">${esc(p.name)}</span><span class="muted">${esc(p.zone)} · ✅ ${p.score}</span></li>`).join('')||'<li class="muted">Nobody else yet. Share the link with the group code.</li>'}</ul>
+    <button class="primary" id="cl">Close</button>`);
+  m.querySelectorAll('[data-ev]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const ok=await SLRoom.trigger(b.dataset.ev); toast(ok?'✅ Sent to everyone':'⚠️ Could not send the event', ok?'':'bad'); closeModal(); });
+  m.querySelector('#cl').onclick=closeModal;
+}
+function setHud(on){ ['hud','act','phoneBtn','camBtn','autoBtn','guideBtn','muteBtn','setBtn','hint'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on) $('roomBtn').classList.add('hidden'); if(!on){$('guidePanel').classList.add('hidden');$('prompt').classList.add('hidden');$('timer').classList.add('hidden');$('alarmv').classList.add('hidden');} }
 function showStart(){
   setHud(false); started=false; profile.role=null; newGame(); paused=true;
   const m=openModal(`<p class="muted" style="margin:0 0 6px;font-weight:700">Choose a game</p><div class="games"><a class="gcard ${GAME_ID==='factory'?'on':''}" href="index.html"><span class="gi">🏭</span><b>Factory Site Induction</b><small>Workers & visitors</small></a><a class="gcard ${GAME_ID==='factory-advanced'?'on':''}" href="index.html?course=advanced"><span class="gi">🧗🏾</span><b>Advanced Site Course</b><small>Height, confined space, hot work…</small></a><a class="gcard ${GAME_ID==='oga'?'on':''}" href="index.html?mode=oga"><span class="gi">🧔🏾</span><b>Oga Mode</b><small>Supervisors</small></a><a class="gcard" href="kids.html?world=home"><span class="gi">🏠🚌</span><b>Home → School Bus</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=school"><span class="gi">🏫</span><b>School Safety</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=market"><span class="gi">🛒</span><b>Market & Road Trip</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=water"><span class="gi">🏖️</span><b>Beach & Pool</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=online"><span class="gi">📱</span><b>Online Safety</b><small>Kids 8–14</small></a></div><h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
@@ -1143,6 +1170,7 @@ function showStart(){
     <div class="row" style="margin-top:6px">${SKINS.map(c=>`<button class="sw ${c===profile.skin?'on':''}" data-s="${c}" style="background:${c}" aria-label="skin tone"></button>`).join('')}</div>
     ${MODE==='oga'?`<p><b>Your role</b></p><div class="big" id="rolebox">🧔🏾 Supervisor (Oga)</div><p class="muted" id="roletask"></p>`:`<p><b>Role lottery 🎲</b> <span class="muted">Like Lagos Life's birth lottery, you don't choose.</span></p>
     <div class="big" id="rolebox">🎲 ?</div><p class="muted" id="roletask"></p>`}
+    <p><b>Group code</b> <span class="muted">(optional: play together with a trainer)</span></p><input id="room" placeholder="e.g. ACME7" maxlength="8" value="${esc(SLRoom.code||'')}" style="text-transform:uppercase">
     ${SL.consent.html(false)}
     <div class="row" id="startRow" style="margin-top:10px"><button id="spin">Spin role</button><button class="primary" id="start" disabled>Start shift ▶</button><button id="stSet">⚙️ Language &amp; settings</button></div>
     <p class="muted" style="font-size:.85rem;margin-top:12px">🎮 <b>Computer:</b> WASD to walk, drag the mouse to look, E to interact, V to switch first/third person.<br>📱 <b>Phone:</b> drag the left side of the screen to walk, drag the right side to look, and tap the green button to interact.</p>`);
@@ -1162,7 +1190,7 @@ function showStart(){
   m.querySelector('#start').onclick=()=>{
     if(!SL.consent.ok()){ const c=m.querySelector('.consent'); c.style.outline='3px solid var(--bad)'; c.scrollIntoView({block:'center'}); toast(tr('Please tick the privacy notice box to start.'),'bad'); return; }
     profile.name=(m.querySelector('#nm').value.trim()||'Guest').slice(0,40); profile.company=m.querySelector('#co').value.trim().slice(0,60);
-    G.resetDynamic(); started=true; closeModal(); setHud(true);
+    G.resetDynamic(); started=true; closeModal(); setHud(true); startRoom(m.querySelector('#room').value);
     if(MODE==='oga'){ toast('🧔🏾 You are the supervisor today. Watch for the red ⚠ STOP signs and get there fast.'); return; }
     toast('🛵 The okada has dropped you at the Main Gate. Your HSE Escort will show you round. Follow the arrows.');
     setTimeout(()=>toast('📱 Tap "Tasks" to see what to do. Follow the yellow ! markers.'),2600);
