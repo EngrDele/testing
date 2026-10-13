@@ -8,7 +8,7 @@
 .cert .nm{font-size:1.6rem;font-weight:800;margin:6px 0}
 #hint2{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:6;background:var(--hud);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:700;font-size:14px}
 #kidbar{display:flex;gap:12px;align-items:center;font-size:15px;font-weight:700}
-#tasksBtn{right:106px;bottom:30px}#camBtn{right:106px;bottom:86px}#voiceBtn{right:106px;bottom:142px;font-size:13px}#guideBtn{right:106px;bottom:198px;font-size:13px}
+#setBtn{left:66px;bottom:22px;opacity:.9}#tasksBtn{right:106px;bottom:30px}#camBtn{right:106px;bottom:86px}#voiceBtn{right:106px;bottom:142px;font-size:13px}#guideBtn{right:106px;bottom:198px;font-size:13px}
 .btnlink{display:inline-block;text-decoration:none;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:10px 14px;font-weight:600}
 .btnlink.wa{background:#25D366;border-color:#1da851;color:#06290f}
 </style></head><body>
@@ -19,7 +19,7 @@
 <div id="prompt" class="hidden"></div><div id="guidePanel" class="hidden"><span id="gArrow">⬆</span><span id="gText"></span></div>
 <div id="joy" class="hidden"><i></i></div>
 <button id="act" class="hidden">E</button>
-<button id="tasksBtn" class="fbtn hidden">📋 Jobs</button><button id="camBtn" class="fbtn hidden">👁️ View</button><button id="voiceBtn" class="fbtn hidden">🗣️ Voice: ON</button><button id="guideBtn" class="fbtn hidden">🧭 Guide: ON</button><button id="muteBtn" class="fbtn hidden">🔊</button>
+<button id="tasksBtn" class="fbtn hidden">📋 Jobs</button><button id="camBtn" class="fbtn hidden">👁️ View</button><button id="voiceBtn" class="fbtn hidden">🗣️ Voice: ON</button><button id="guideBtn" class="fbtn hidden">🧭 Guide: ON</button><button id="muteBtn" class="fbtn hidden">🔊</button><button id="setBtn" class="fbtn hidden" title="Settings">⚙️</button>
 <div id="timer" class="hidden"></div><div id="alarmv" class="alarmv hidden"></div><div id="ovl"></div>
 <!--@@CDN@@-->
 <script>
@@ -30,7 +30,7 @@ const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x
 const dist = (a,b,c,d) => Math.hypot(a-c,b-d);
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 
-/*@@ENGINE@@*/
 /*@@COMMON@@*/
+/*@@ENGINE@@*/
 /*@@KIDS@@*/
 </script></body></html>

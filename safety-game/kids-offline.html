@@ -58,6 +58,18 @@ input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);
 .ppe-grid button .e{font-size:30px}
 .ppe-grid button.on{border:2px solid var(--brand);background:color-mix(in srgb,var(--brand) 14%,var(--chip))}
 #muteBtn{left:12px;bottom:22px;opacity:.9}
+#setBtn{left:66px;bottom:22px;opacity:.9}
+html{font-size:calc(15px * var(--fs,1))}
+body,.modal,button,input{font-size:1rem}
+input[type=checkbox]{width:auto;margin-right:6px;vertical-align:middle}
+.modal label{cursor:pointer}
+.consent{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--chip);border:1px solid var(--line);font-size:.9rem}
+.consent label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.consent input{width:auto;margin-top:3px}
+.consent details{margin-top:6px}.consent summary{cursor:pointer;color:var(--muted)}
+#slCaption{position:fixed;left:50%;bottom:210px;transform:translateX(-50%);z-index:9;max-width:min(92vw,640px);background:rgba(0,0,0,.78);color:#fff;padding:8px 14px;border-radius:10px;font-size:1rem;line-height:1.35;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
+#slCaption.on{opacity:1}
+select{font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink)}
+.course{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.course button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;font-size:.85rem}.course button small{color:var(--muted)}.course button.on{border:2px solid var(--brand)}
 #prompt{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:5;background:var(--hud);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-weight:600;pointer-events:none;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
 #joy{position:fixed;z-index:4;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.6);background:rgba(255,255,255,.15);pointer-events:none;transform:translate(-50%,-50%)}
 #joy i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px;border-radius:50%;background:rgba(255,255,255,.75)}
@@ -100,7 +112,7 @@ table{width:100%;border-collapse:collapse;font-size:.82rem}td,th{border-bottom:1
 .cert .nm{font-size:1.6rem;font-weight:800;margin:6px 0}
 #hint2{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:6;background:var(--hud);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:700;font-size:14px}
 #kidbar{display:flex;gap:12px;align-items:center;font-size:15px;font-weight:700}
-#tasksBtn{right:106px;bottom:30px}#camBtn{right:106px;bottom:86px}#voiceBtn{right:106px;bottom:142px;font-size:13px}#guideBtn{right:106px;bottom:198px;font-size:13px}
+#setBtn{left:66px;bottom:22px;opacity:.9}#tasksBtn{right:106px;bottom:30px}#camBtn{right:106px;bottom:86px}#voiceBtn{right:106px;bottom:142px;font-size:13px}#guideBtn{right:106px;bottom:198px;font-size:13px}
 .btnlink{display:inline-block;text-decoration:none;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:10px 14px;font-weight:600}
 .btnlink.wa{background:#25D366;border-color:#1da851;color:#06290f}
 </style></head><body>
@@ -111,7 +123,7 @@ table{width:100%;border-collapse:collapse;font-size:.82rem}td,th{border-bottom:1
 <div id="prompt" class="hidden"></div><div id="guidePanel" class="hidden"><span id="gArrow">⬆</span><span id="gText"></span></div>
 <div id="joy" class="hidden"><i></i></div>
 <button id="act" class="hidden">E</button>
-<button id="tasksBtn" class="fbtn hidden">📋 Jobs</button><button id="camBtn" class="fbtn hidden">👁️ View</button><button id="voiceBtn" class="fbtn hidden">🗣️ Voice: ON</button><button id="guideBtn" class="fbtn hidden">🧭 Guide: ON</button><button id="muteBtn" class="fbtn hidden">🔊</button>
+<button id="tasksBtn" class="fbtn hidden">📋 Jobs</button><button id="camBtn" class="fbtn hidden">👁️ View</button><button id="voiceBtn" class="fbtn hidden">🗣️ Voice: ON</button><button id="guideBtn" class="fbtn hidden">🧭 Guide: ON</button><button id="muteBtn" class="fbtn hidden">🔊</button><button id="setBtn" class="fbtn hidden" title="Settings">⚙️</button>
 <div id="timer" class="hidden"></div><div id="alarmv" class="alarmv hidden"></div><div id="ovl"></div>
 <script>/* three.js r128 (MIT License) */
 /**
@@ -356,6 +368,228 @@ const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x
 const dist = (a,b,c,d) => Math.hypot(a-c,b-d);
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 
+// Site Life shared features for all games. Built into pages by src/build.py.
+// SL.consent  privacy notice and consent (NDPA 2023)
+// SL.t        translation with English fallback; SL.lang current language
+// SL.settings graphics quality, text size, captions, colour-blind palette
+// SL.caption  on-screen captions for spoken text
+// SL.post     send a result to our server / Google Sheets with an offline queue
+const SL = (() => {
+  const QS = new URLSearchParams(location.search);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('sl-' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('sl-' + k, JSON.stringify(v)); } catch (e) {} },
+  };
+  const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ---------- language ----------
+  const LANGS = [
+    { id: 'en', name: 'English', voice: 'en' },
+    { id: 'pcm', name: 'Pidgin', voice: 'en' },
+    { id: 'yo', name: 'Yorùbá', voice: 'yo' },
+    { id: 'ha', name: 'Hausa', voice: 'ha' },
+    { id: 'ig', name: 'Igbo', voice: 'ig' },
+  ];
+  const I18N = (typeof SL_I18N !== 'undefined') ? SL_I18N : {};
+  let lang = QS.get('lang') || store.get('lang', 'en');
+  if (!LANGS.some(l => l.id === lang)) lang = 'en';
+  const misses = new Set();
+  function t(s) { return s == null ? '' : trText(String(s)); }
+  function setLang(id) { lang = id; store.set('lang', id); }
+
+  // Automatic on-screen translation: every text node added to the page is looked up in the
+  // dictionary (exact match, then with a leading emoji/symbol prefix removed, then {0}-patterns).
+  const PAT = {}, VALUES = {};
+  for (const [l, d] of Object.entries(I18N)) {
+    PAT[l] = Object.keys(d).filter(k => k.includes('{0}')).map(k => {
+      const parts = k.split(/\{\d\}/).map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      return { re: new RegExp('^' + parts.join('(.+?)') + '$'), out: d[k] };
+    });
+    VALUES[l] = new Set(Object.values(d));
+  }
+  const PREFIX = /^([\s\p{Extended_Pictographic}\p{S}\p{P}‍️]*?)([\p{L}"'(].*?)([\s.!?…:]*)$/su;
+  function trText(s) {
+    if (lang === 'en' || !s || !/\p{L}/u.test(s)) return s;
+    const d = I18N[lang] || {}, core = s.trim();
+    if (d[core] != null) return s.replace(core, d[core]);
+    if (VALUES[lang] && VALUES[lang].has(core)) return s;
+    const m = core.match(PREFIX);
+    if (m) {
+      const body = m[2] + m[3];
+      if (d[body] != null) return s.replace(core, m[1] + d[body]);
+      if (d[m[2]] != null) return s.replace(core, m[1] + d[m[2]] + m[3]);
+    }
+    for (const p of PAT[lang] || []) { const mm = core.match(p.re); if (mm) return s.replace(core, p.out.replace(/\{(\d)\}/g, (_, i) => mm[+i + 1])); }
+    if (core.length > 2 && core.length < 400) misses.add(core);
+    return s;
+  }
+  function translateTree(root) {
+    if (lang === 'en' || !root) return;
+    if (root.nodeType === 3) { const v = trText(root.data); if (v !== root.data) root.data = v; return; }
+    if (root.nodeType !== 1 || root.closest && root.closest('[data-notr],script,style,textarea')) return;
+    for (const a of ['placeholder', 'title', 'aria-label']) if (root.hasAttribute && root.hasAttribute(a)) root.setAttribute(a, trText(root.getAttribute(a)));
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      if (n.nodeType === 1) { if (/^(SCRIPT|STYLE|TEXTAREA)$/.test(n.tagName) || n.hasAttribute('data-notr')) continue;
+        for (const a of ['placeholder', 'title', 'aria-label']) if (n.hasAttribute(a)) n.setAttribute(a, trText(n.getAttribute(a))); continue; }
+      if (n.parentElement && n.parentElement.closest('[data-notr],textarea')) continue;
+      const v = trText(n.data); if (v !== n.data) n.data = v;
+    }
+  }
+  if (lang !== 'en') {
+    const mo = new MutationObserver(ms => { for (const m of ms) { if (m.type === 'characterData') translateTree(m.target); else m.addedNodes.forEach(translateTree); } });
+    const startObs = () => { translateTree(document.body); mo.observe(document.body, { childList: true, subtree: true, characterData: true }); };
+    document.body ? startObs() : addEventListener('DOMContentLoaded', startObs);
+  }
+
+  // ---------- consent ----------
+  const CONSENT_V = 1;
+  const consent = {
+    ok() { return store.get('consent', 0) >= CONSENT_V; },
+    give() { store.set('consent', CONSENT_V); },
+    notice(kids) {
+      return kids
+        ? t('A parent or teacher should read this: the game saves the child\'s first name, stars and answers so parents and teachers can see progress. It is only sent if the game is opened from a school or family link, is kept only as long as the school decides, and is never sold or shared.')
+        : t('This induction saves your name, company, role, answers and result so the HSE team can confirm you completed it. Only HSE can see the results. They are kept for the period set by the company (normally 12 months) and then deleted. You can ask HSE to see or delete your record.');
+    },
+    // Returns HTML for a checkbox block; call bind(modal, startBtn) after rendering.
+    html(kids) {
+      const ok = this.ok();
+      return `<div class="consent"><label><input type="checkbox" id="slConsent" ${ok ? 'checked' : ''}> ${escH(t(kids ? 'A parent or teacher agrees to the privacy notice' : 'I have read and agree to the privacy notice'))}</label>
+        <details><summary>${escH(t('Privacy notice'))}</summary><p>${escH(this.notice(kids))}</p></details></div>`;
+    },
+    bind(m, btn) {
+      const cb = m.querySelector('#slConsent'); if (!cb) return;
+      const upd = () => { if (btn) btn.disabled = !cb.checked || btn.dataset.waiting === '1'; if (cb.checked) consent.give(); else store.set('consent', 0); };
+      cb.onchange = upd; upd();
+    },
+  };
+
+  // ---------- settings ----------
+  const DEF = { quality: 'auto', text: 1, captions: true, cb: false, voice: true };
+  const settings = Object.assign({}, DEF, store.get('settings', {}));
+  const save = () => store.set('settings', settings);
+  function applyCss() {
+    document.documentElement.style.setProperty('--fs', settings.text);
+    document.documentElement.classList.toggle('cbsafe', !!settings.cb);
+  }
+  const autoQuality = () => (Math.min(innerWidth, innerHeight) < 700 || /Android|iPhone|iPad/i.test(navigator.userAgent)) ? 'medium' : 'high';
+  function quality() { return settings.quality === 'auto' ? (store.get('autoLow', false) ? 'low' : autoQuality()) : settings.quality; }
+  const markerColor = () => settings.cb ? '#1f77ff' : '#ffd400';
+
+  // fps watchdog: switch to low quality when the device struggles (auto mode only)
+  const fps = { acc: 0, n: 0, low: 0, cb: null,
+    tick(dt) {
+      if (settings.quality !== 'auto' || quality() === 'low') return;
+      this.acc += dt; this.n++;
+      if (this.acc >= 2) { const f = this.n / this.acc; this.acc = 0; this.n = 0; this.low = f < 25 ? this.low + 1 : 0;
+        if (this.low >= 3) { store.set('autoLow', true); this.cb && this.cb('low'); } }
+    } };
+
+  function settingsHtml() {
+    const q = settings.quality, opt = (v, l) => `<option value="${v}" ${q === v ? 'selected' : ''}>${escH(t(l))}</option>`;
+    return `<h2>⚙️ ${escH(t('Settings'))}</h2>
+      <p><b>${escH(t('Language'))}</b></p><div class="row" id="slLangs">${LANGS.map(l => `<button data-lang="${l.id}" class="${l.id === lang ? 'primary' : ''}">${escH(l.name)}</button>`).join('')}</div>
+      <p class="muted" style="font-size:.85rem">${escH(t('Yorùbá, Hausa and Igbo are draft translations being reviewed. Untranslated text shows in English.'))}</p>
+      <p><b>${escH(t('Graphics quality'))}</b></p><select id="slQ">${opt('auto', 'Automatic')}${opt('low', 'Low (old phones)')}${opt('medium', 'Medium')}${opt('high', 'High')}</select>
+      <p><b>${escH(t('Text size'))}</b></p><div class="row">${[[1, 'A'], [1.15, 'A+'], [1.3, 'A++']].map(([v, l]) => `<button data-fs="${v}" class="${settings.text == v ? 'primary' : ''}">${l}</button>`).join('')}</div>
+      <p><label><input type="checkbox" id="slCap" ${settings.captions ? 'checked' : ''}> ${escH(t('Show captions for spoken words'))}</label></p>
+      <p><label><input type="checkbox" id="slVoice" ${settings.voice ? 'checked' : ''}> ${escH(t('Read questions aloud'))}</label></p>
+      <p><label><input type="checkbox" id="slCb" ${settings.cb ? 'checked' : ''}> ${escH(t('Colour-blind friendly markers'))}</label></p>
+      <p class="muted" style="font-size:.85rem">${escH(t('Keyboard: WASD or arrows to move, E to interact, 1/2/3 to choose an answer, V to change view.'))}</p>
+      <div class="row" style="margin-top:10px"><button class="primary" id="slClose">${escH(t('Done'))}</button></div>`;
+  }
+  // open the settings modal; onChange(kind) lets the page re-apply (kind: 'quality'|'lang'|'other')
+  function openSettings(openModal, closeModal, onChange) {
+    const m = openModal(settingsHtml());
+    const ch = (k) => { save(); applyCss(); onChange && onChange(k); };
+    m.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { setLang(b.dataset.lang); closeModal(); onChange && onChange('lang'); });
+    m.querySelector('#slQ').onchange = e => { settings.quality = e.target.value; store.set('autoLow', false); ch('quality'); };
+    m.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => { settings.text = +b.dataset.fs; m.querySelectorAll('[data-fs]').forEach(x => x.classList.toggle('primary', x === b)); ch('other'); });
+    m.querySelector('#slCap').onchange = e => { settings.captions = e.target.checked; ch('other'); };
+    m.querySelector('#slVoice').onchange = e => { settings.voice = e.target.checked; ch('other'); };
+    m.querySelector('#slCb').onchange = e => { settings.cb = e.target.checked; ch('cb'); };
+    m.querySelector('#slClose').onclick = () => { closeModal(); };
+  }
+
+  // ---------- captions + speech ----------
+  let capTimer = 0;
+  function caption(text, ms = 4500) {
+    if (!settings.captions || !text) return;
+    let el = document.getElementById('slCaption');
+    if (!el) { el = document.createElement('div'); el.id = 'slCaption'; document.body.appendChild(el); }
+    el.textContent = text; el.classList.add('on'); clearTimeout(capTimer); capTimer = setTimeout(() => el.classList.remove('on'), ms);
+  }
+  function speak(text) {
+    caption(text);
+    if (!settings.voice || !window.speechSynthesis) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(String(text).replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, ''));
+      const want = (LANGS.find(l => l.id === lang) || {}).voice || 'en', vs = speechSynthesis.getVoices();
+      u.voice = vs.find(v => v.lang.toLowerCase().startsWith(want)) || vs.find(v => /en-NG/i.test(v.lang)) || vs.find(v => /en-GB/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+      u.rate = .95; speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  const stopSpeak = () => { try { speechSynthesis.cancel(); } catch (e) {} };
+
+  // number keys answer the open question (1 = first option ...)
+  addEventListener('keydown', e => {
+    if (!/^Digit[1-9]$/.test(e.code) || e.target.tagName === 'INPUT') return;
+    const btns = [...document.querySelectorAll('.modal .opts button:not([disabled]), .modal .ppe-grid button:not([disabled])')];
+    const b = btns[+e.code.slice(5) - 1]; if (b) { e.preventDefault(); b.click(); }
+  }, true);
+
+  // ---------- results: server / Google Sheets / offline queue ----------
+  const isClaude = () => /claude\.ai|claudeusercontent/.test(location.hostname);
+  const onWeb = () => /^https?:$/.test(location.protocol) && !isClaude();
+  const sheetsUrl = () => QS.get('results') || '';
+  function targets() {
+    const t2 = [];
+    if (onWeb()) t2.push({ url: 'api/result', mode: 'json' });
+    if (sheetsUrl()) t2.push({ url: sheetsUrl(), mode: 'sheets' });
+    return t2;
+  }
+  async function sendOne(tg, payload) {
+    if (tg.mode === 'sheets') { // Apps Script web apps do not answer CORS; send as simple text and trust it arrived
+      await fetch(tg.url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+      return true;
+    }
+    const r = await fetch(tg.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    return r.ok;
+  }
+  const queue = {
+    all() { return store.get('queue', []); },
+    add(x) { const q = this.all(); q.push(x); store.set('queue', q.slice(-50)); },
+    async flush() {
+      const q = this.all(); if (!q.length) return 0; const left = []; let sent = 0;
+      for (const item of q) { try { (await sendOne(item.tg, item.p)) ? sent++ : left.push(item); } catch (e) { left.push(item); } }
+      store.set('queue', left); return sent;
+    },
+  };
+  // returns 'sent' | 'queued' | 'none' (no target configured) | 'noconsent'
+  async function post(payload) {
+    const tg = targets(); if (!tg.length) return 'none';
+    if (!consent.ok()) return 'noconsent';
+    payload = Object.assign({ lang, client: navigator.userAgent.slice(0, 80) }, payload);
+    let any = false;
+    for (const x of tg) {
+      try { if (await sendOne(x, payload)) any = true; else queue.add({ tg: x, p: payload }); }
+      catch (e) { queue.add({ tg: x, p: payload }); }
+    }
+    return any ? 'sent' : 'queued';
+  }
+  addEventListener('online', () => queue.flush());
+  setTimeout(() => queue.flush(), 3000);
+
+  // installable offline app (only when served from our own web server)
+  if (onWeb() && 'serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+
+  applyCss();
+  return { QS, store, t, LANGS, get lang() { return lang; }, setLang, misses, consent, settings, quality, markerColor, fps, openSettings, caption, speak, stopSpeak, post, queue, onWeb, isClaude, escH };
+})();
+const tr = SL.t;
+
 // Site Life shared 3D engine (textures, materials, people, vehicles, props, mesh merging).
 // Used by the factory game (src/factory.html) and the kids games (src/kids-game.js). Built into pages by src/build.py.
 // ================== 3D (realistic) ==================
@@ -448,11 +682,13 @@ function signCanvas(kind, title, sub=''){
   });
 }
 function boardCanvas(text,bg='#12355b',fg='#ffffff'){
+  if(typeof tr==='function') text=tr(text);
   const m=mkCanvas(10,10).getContext('2d'); m.font='bold 64px system-ui'; const tw=m.measureText(text).width;
   return mkCanvas(Math.ceil(tw+80),110,(c,w,h)=>{ c.fillStyle=bg; c.fillRect(0,0,w,h); c.fillStyle='rgba(255,255,255,.08)'; c.fillRect(0,0,w,h/2);
     c.strokeStyle='#c9c9c9'; c.lineWidth=6; c.strokeRect(3,3,w-6,h-6); c.fillStyle=fg; c.font='bold 64px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(text,w/2,h/2+3); });
 }
 function labelSprite(text,h=.28){
+  if(typeof tr==='function') text=tr(text);
   const m=mkCanvas(10,10).getContext('2d'); m.font='600 40px system-ui'; const tw=Math.ceil(m.measureText(text).width)+30;
   const c=mkCanvas(tw,60,(x,w,hh)=>{ x.fillStyle='rgba(15,20,25,.6)'; x.beginPath(); x.moveTo(14,0); x.arcTo(w,0,w,hh,14); x.arcTo(w,hh,0,hh,14); x.arcTo(0,hh,0,0,14); x.arcTo(0,0,w,0,14); x.fill(); x.fillStyle='#fff'; x.font='600 40px system-ui'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(text,w/2,hh/2+2); });
   const t=tex(c); const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,toneMapped:false,depthWrite:false})); s.scale.set(h*tw/60,h,1); return s;
@@ -770,12 +1006,10 @@ function makeProp(kind){
 }
 
 
-// Site Life shared features for all games (consent, language, settings, offline queue). Built into pages by src/build.py.
-
 // ================== KIDS GAME (home→bus, school) ==================
 const PARAMS = new URLSearchParams(location.search);
 const WORLD = PARAMS.get('world')==='school' ? 'school' : 'home';
-let S=null, paused=true, started=false, guideOn=true, voiceOn=true, firstPerson=false, muted=false, audio=null;
+let S=null, paused=true, started=false, guideOn=true, firstPerson=false, muted=false, audio=null;
 let yaw=0, pitch=.42; const keys={}; let joy=null, look=null;
 const kid = {name:'', sex:'f', skin:'#5a3825', uni:'#1f4e8c'};
 const SKINS=['#3b2416','#5a3825','#7b4a2e','#a0663f'], UNIS=['#1f4e8c','#7a1f2b','#1f6b3a','#6b4f8a','#c46a12'];
@@ -785,7 +1019,7 @@ function ensureAudio(){ if(!audio){ try{ audio=new (window.AudioContext||window.
 function beep(f=880,d=.12,type='square',v=.05){ if(muted||!audio) return; try{ const o=audio.createOscillator(), g=audio.createGain(); o.type=type; o.frequency.value=f; o.connect(g); g.connect(audio.destination); const t=audio.currentTime; g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(.0001,t+d); o.start(t); o.stop(t+d);}catch(e){} }
 const chime=()=>{ beep(660,.12,'sine',.08); setTimeout(()=>beep(990,.18,'sine',.08),110); setTimeout(()=>beep(1320,.2,'sine',.06),230); };
 const buzz=()=>beep(150,.35,'sawtooth',.06);
-function speak(text){ if(!voiceOn||muted||!window.speechSynthesis) return; try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu,'')); const vs=speechSynthesis.getVoices(); u.voice=vs.find(v=>/en-NG/i.test(v.lang))||vs.find(v=>/en-GB/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null; u.rate=.95; u.pitch=1.05; speechSynthesis.speak(u);}catch(e){} }
+function speak(text){ if(muted) return; SL.speak(tr(text)); }
 
 // ---------- UI ----------
 function toast(msg,kind=''){ const d=document.createElement('div'); d.className='tst '+kind; d.textContent=msg; $('toast').appendChild(d); setTimeout(()=>d.remove(),3600); while($('toast').children.length>2) $('toast').firstChild.remove(); }
@@ -890,8 +1124,8 @@ function ask(m, onDone){
   const q=m.q; const opts=shuffle(q.o.map((o,i)=>({o,i})));
   const mm=openModal(`<div class="who"><span class="av">${q.e}</span><div><div class="muted" style="font-size:.85rem">${esc(q.who)}</div><h2>${esc(m.name)}</h2></div><button class="spk" id="spk" title="Read aloud">🔊</button></div>
     <p class="qt">${esc(q.text)}</p><div class="opts">${opts.map(({o,i})=>`<button data-i="${i}">${esc(o.t)}</button>`).join('')}</div><div id="fb"></div>`);
-  speak(q.text+'. '+opts.map(({o},k)=>'Option '+(k+1)+': '+o.t).join('. '));
-  mm.querySelector('#spk').onclick=()=>{ const v=voiceOn; voiceOn=true; speak(q.text); voiceOn=v; };
+  speak(tr(q.text)+'. '+opts.map(({o},k)=>tr('Option')+' '+(k+1)+': '+tr(o.t)).join('. '));
+  mm.querySelector('#spk').onclick=()=>{ const v=SL.settings.voice; SL.settings.voice=true; speak(q.text); SL.settings.voice=v; };
   mm.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{
     const o=q.o[+b.dataset.i]; mm.querySelectorAll('[data-i]').forEach(x=>x.disabled=true);
     if(o.ok){ S.stars++; chime(); } else { buzz(); S.mistakes.push({where:m.name,why:o.why}); if(o.heart) loseHeart(); }
@@ -924,7 +1158,7 @@ function interactables(){
 function inspect(it){
   const m=openModal(`<div class="who"><span class="av">${it.e}</span><h2>Look closely</h2><button class="spk" id="spk">🔊</button></div><p class="qt">You see: <b>${esc(it.t)}</b></p>
     <div class="opts"><button id="r1">⚠️ That is dangerous! Tell an adult</button><button id="r2">👍 That is safe</button></div><div id="fb"></div>`);
-  speak('You see: '+it.t+'. Is it dangerous or safe?'); m.querySelector('#spk').onclick=()=>{ const v=voiceOn; voiceOn=true; speak(it.t); voiceOn=v; };
+  speak(tr('You see:')+' '+tr(it.t)+'. '+tr('Is it dangerous or safe?')); m.querySelector('#spk').onclick=()=>{ const v=SL.settings.voice; SL.settings.voice=true; speak(it.t); SL.settings.voice=v; };
   const fin=(rep)=>{ m.querySelectorAll('.opts button').forEach(b=>b.disabled=true); let ok=true,msg;
     if(it.h&&rep){ S.hazFound++; S.stars++; msg='Well spotted! You found a danger. ⭐'; }
     else if(it.h){ ok=false; S.mistakes.push({where:'Danger missed',why:'"'+it.t+'" is dangerous. Always tell an adult.'}); msg='Oh no! That is dangerous. Always tell an adult.'; }
@@ -1010,7 +1244,7 @@ function endGame(win){
   const level = !win? '' : S.stars>=total-2 ? 'GOLD' : S.stars>=total-6 ? 'SILVER' : 'BRONZE';
   const txt=`${DATA.title.toUpperCase()} – SAFETY STAR\nName: ${kid.name}\nResult: ${win?level+' ⭐ '+S.stars+' stars':'Try again'}\nDangers found: ${S.hazFound}/${S.hazTotal}\nDate: ${new Date().toLocaleString()}`;
   win?chime():buzz();
-  if(/^https?:$/.test(location.protocol) && !/claude\.ai|claudeusercontent/.test(location.hostname)) fetch('api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:WORLD,name:kid.name,role:'Pupil',result:win?level:'TRY AGAIN',hazards:S.hazFound+'/'+S.hazTotal,mistakes:S.mistakes.length,where:[...new Set(S.mistakes.map(x=>x.where))],stars:S.stars,date:new Date().toLocaleString()})}).catch(()=>{});
+  SL.post({game:WORLD,name:kid.name,role:'Pupil',result:win?level:'TRY AGAIN',hazards:S.hazFound+'/'+S.hazTotal,mistakes:S.mistakes.length,where:[...new Set(S.mistakes.map(x=>x.where))],stars:S.stars,date:new Date().toLocaleString()});
   const m=openModal(`<h1 style="margin:.1em 0">${win?'🎉 You did it!':'😮 Oops! Let\'s try again'}</h1>
     ${win?`<div class="cert"><div class="big">🏅 ${level} SAFETY STAR</div><div class="muted">${esc(DATA.title)}</div><div class="nm">${esc(kid.name)}</div><div>⭐ ${S.stars} stars · 🔎 ${S.hazFound}/${S.hazTotal} dangers found · ❤️ ${S.hearts} hearts left</div><div class="muted">${new Date().toLocaleDateString()}</div></div>`
           :`<p class="qt">You ran out of hearts. Every mistake is a chance to learn!</p>`}
@@ -1144,8 +1378,8 @@ function initScene(){
     wall:(()=>{ const m=std('#efe6d2',{r:.92}); m.map=tex(TX.plaster,1,1); return m; })(), wall2:(()=>{ const m=std('#cfe0ef',{r:.92}); m.map=tex(TX.plaster,1,1); return m; })(), wall3:(()=>{ const m=std('#f3d9b1',{r:.92}); m.map=tex(TX.plaster,1,1); return m; })(), block:(()=>{ const m=std('#efe6d2',{r:.92}); m.map=tex(TX.block,3,1); m.normalMap=tex(TX.blockN,3,1,false); return m; })(), cope:std('#cfc8b8',{r:.9}) };
   if(WORLD==='home') buildHome(scene); else buildSchool(scene);
   // markers, items, escort, player
-  const ringM=new THREE.MeshBasicMaterial({color:'#ffd400',transparent:true,opacity:.75,depthWrite:false});
-  const markers=MISS.filter(m=>m.r).map(m=>{ const ring=new THREE.Mesh(new THREE.RingGeometry(.5,.68,32),ringM.clone()); ring.rotation.x=-Math.PI/2; ring.position.set(X(m.x),.03,Z(m.y)); scene.add(ring); const s=labelSprite('!',.36); s.material.color=new THREE.Color('#ffe14d'); s.position.set(X(m.x),2.1,Z(m.y)); scene.add(s); return {m,ring,s}; });
+  const ringM=new THREE.MeshBasicMaterial({color:SL.markerColor(),transparent:true,opacity:.75,depthWrite:false});
+  const markers=MISS.filter(m=>m.r).map(m=>{ const ring=new THREE.Mesh(new THREE.RingGeometry(.5,.68,32),ringM.clone()); ring.rotation.x=-Math.PI/2; ring.position.set(X(m.x),.03,Z(m.y)); scene.add(ring); const s=labelSprite('!',.36); s.material.color=new THREE.Color(SL.markerColor()); s.position.set(X(m.x),2.1,Z(m.y)); scene.add(s); return {m,ring,s}; });
   const chev=new THREE.Shape([[-.3,-.22],[0,.12],[.3,-.22],[.3,-.05],[0,.3],[-.3,-.05]].map(([x,y])=>new THREE.Vector2(x,y))); const cg=new THREE.ShapeGeometry(chev); cg.rotateX(-Math.PI/2);
   const arrows=new THREE.InstancedMesh(cg,new THREE.MeshBasicMaterial({color:'#ffd21a',transparent:true,opacity:.9,depthWrite:false,toneMapped:false}),60); arrows.frustumCulled=false; arrows.count=0; scene.add(arrows);
   const escort=makeHuman({...DATA.escort.look, label:DATA.escort.label, topMap: DATA.escort.look.topMap? ankara('#c0392b','#f1c40f','#1abc9c'):null, gele: DATA.escort.look.gele? ankara('#f1c40f','#c0392b','#ffffff'):null}); scene.add(escort);
@@ -1153,8 +1387,18 @@ function initScene(){
   const smoke=[]; if(WORLD==='school'){ const st=SMOKE_TEX(); for(let i=0;i<30;i++){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:st,transparent:true,depthWrite:false,opacity:.85,color:lin('#555')})); s.userData={a:Math.random()*Math.PI*2,r:Math.sqrt(Math.random()),h:Math.random()}; s.visible=false; scene.add(s); smoke.push(s);} }
   flushInst(scene);
   G={renderer,scene,camera,sun,markers,arrows,escort,smoke,player:null,items:[],veh:[],shake:0};
-  addEventListener('resize',resize3D); resize3D();
+  addEventListener('resize',resize3D); resize3D(); applyQuality();
+  SL.fps.cb=()=>{ applyQuality(); toast(tr('Graphics set to Low to keep the game smooth on this device. Change it in ⚙️ Settings.')); };
 }
+
+function applyQuality(){
+  if(!G) return; const q=SL.quality(), r=G.renderer;
+  r.setPixelRatio(q==='low'?Math.min(1,devicePixelRatio||1)*.8:q==='medium'?1:Math.min(1.5,devicePixelRatio||1)); resize3D();
+  const shadows=q!=='low'; if(r.shadowMap.enabled!==shadows){ r.shadowMap.enabled=shadows; G.scene.traverse(o=>{ if(o.material) [].concat(o.material).forEach(m=>m.needsUpdate=true); }); }
+  G.scene.traverse(o=>{ if(o.userData&&o.userData.decor) o.visible=q!=='low'; });
+}
+function applyMarkerColor(){ if(!G) return; const c=new THREE.Color(SL.markerColor()); G.markers.forEach(m=>{ m.ring.material.color.copy(c); m.s.material.color.copy(c); }); G.arrows.material.color.set(SL.settings.cb?'#1f77ff':'#ffd21a'); }
+function openSettings(after){ SL.openSettings(openModal, ()=>{ closeModal(); after&&after(); }, k=>{ if(k==='lang'){ const u=new URL(location.href); u.searchParams.set('lang',SL.lang); location.href=u.href; } if(k==='quality') applyQuality(); if(k==='cb') applyMarkerColor(); }); }
 function resize3D(){ if(!G) return; G.renderer.setSize(innerWidth,innerHeight,false); G.camera.aspect=innerWidth/innerHeight; G.camera.fov=innerWidth<innerHeight?70:60; G.camera.updateProjectionMatrix(); }
 function makeKid(){
   const g=makeHuman({sex:kid.sex, skin:kid.skin, top:kid.sex==='f'?'#ffffff':'#f5f5f5', bottom:kid.uni, dress:kid.sex==='f', outfit:kid.sex==='f'?'dress':'shirt', topMap:kid.sex==='f'?mkCanvas(64,64,(c)=>{ c.fillStyle=kid.uni; c.fillRect(0,0,64,64); c.fillStyle='rgba(255,255,255,.25)'; c.fillRect(0,0,64,6); }):null,
@@ -1213,7 +1457,7 @@ function buildHome(scene){
   // compound
   place(scene,F.generator(),845,330,0,[50,30]); place(scene,F.well(),200,600,0,[80,80]); place(scene,F.car('#2e4053'),690,600,Math.PI/2,[100,46]);
   for(const [x,z] of [[80,640],[860,80],[80,80]]) place(scene,F.tree(),x,z,0,[20,20]);
-  for(let x=-300;x<1900;x+=260) place(scene,F.palm(),x,1100,0);
+  for(let x=-300;x<1900;x+=260) place(scene,F.palm(),x,1100,0).userData.decor=true;
   // NPCs
   G_NPC.push({look:{sex:'m',skin:'#3d2416',top:'#5d6d7e',bottom:'#2a2f3a',longSleeve:true,beard:true,label:'Stranger'},x:450,y:745,face:0});
   G_NPC.push({look:{sex:'f',skin:'#3b2416',top:'#f2f2f2',bottom:'#1f2a40',vest:true,vestColor:'#ff7a00',hat:'cap',hatColor:'#ffffff',label:'Crossing guard',longSleeve:true},x:880,y:770,face:Math.PI/2,lolly:true});
@@ -1262,7 +1506,7 @@ function buildSchool(scene){
   const bus=F.bus(); place(scene,bus,1250,990,Math.PI/2,[190,52]);
   // trees
   for(const [x,y] of [[80,1000],[1440,560],[560,560],[960,820],[80,560]]) place(scene,F.tree(),x,y,0,[20,20]);
-  for(let x=-300;x<1900;x+=260) place(scene,F.palm(),x,1230,0);
+  for(let x=-300;x<1900;x+=260) place(scene,F.palm(),x,1230,0).userData.decor=true;
   // NPCs
   G_NPC.push({look:{sex:'m',skin:'#3b2416',top:'#2b3f66',bottom:'#1f2a40',hat:'cap',hatColor:'#1b2538',longSleeve:true,beard:true,label:'Gatekeeper'},x:840,y:1030,face:Math.PI});
   G_NPC.push({look:{sex:'m',skin:'#5a3825',top:'#555',bottom:'#222',longSleeve:true,label:'Stranger'},x:700,y:1130,face:0});
@@ -1312,7 +1556,7 @@ function drawHUD(){
 
 // ================== LOOP & INPUT ==================
 let last=performance.now(), hudT=0;
-function loop(now){ const dt=Math.min(.05,(now-last)/1000); last=now; if(G&&S){ if(!started) renderIntro(now/1000); else { if(!paused&&!S.over) update(dt); render3D(dt); hudT+=dt; if(hudT>.12){ hudT=0; drawHUD(); } } } requestAnimationFrame(loop); }
+function loop(now){ const dt=Math.min(.05,(now-last)/1000); last=now; if(G&&S){ if(!started) renderIntro(now/1000); else { if(!paused) SL.fps.tick(dt); if(!paused&&!S.over) update(dt); render3D(dt); hudT+=dt; if(hudT>.12){ hudT=0; drawHUD(); } } } requestAnimationFrame(loop); }
 addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT'||paused) return; keys[e.code]=true; if(e.code==='KeyE'||e.code==='Space'||e.code==='Enter'){ e.preventDefault(); doAct(); } if(e.code==='KeyV') firstPerson=!firstPerson; if(e.code.startsWith('Arrow')) e.preventDefault(); });
 addEventListener('keyup',e=>{ keys[e.code]=false; });
 function bindInput(){ const cv=$('game');
@@ -1321,11 +1565,13 @@ function bindInput(){ const cv=$('game');
   const end=e=>{ if(joy&&e.pointerId===joy.id){ joy=null; $('joy').classList.add('hidden'); } if(look&&e.pointerId===look.id) look=null; }; cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
   $('act').onclick=doAct; $('camBtn').onclick=()=>{ if(!paused) firstPerson=!firstPerson; };
   $('guideBtn').onclick=()=>{ guideOn=!guideOn; $('guideBtn').textContent='🧭 Guide: '+(guideOn?'ON':'OFF'); };
-  $('voiceBtn').onclick=()=>{ voiceOn=!voiceOn; $('voiceBtn').textContent=voiceOn?'🗣️ Voice: ON':'🗣️ Voice: OFF'; if(!voiceOn) try{ speechSynthesis.cancel(); }catch(e){} };
+  const vb=()=>{ $('voiceBtn').textContent=SL.settings.voice?'🗣️ Voice: ON':'🗣️ Voice: OFF'; }; vb();
+  $('voiceBtn').onclick=()=>{ SL.settings.voice=!SL.settings.voice; SL.store.set('settings',SL.settings); vb(); if(!SL.settings.voice) SL.stopSpeak(); };
+  $('setBtn').onclick=()=>{ if(!paused) openSettings(); };
   $('muteBtn').onclick=()=>{ muted=!muted; $('muteBtn').textContent=muted?'🔇':'🔊'; };
   $('tasksBtn').onclick=()=>{ if(paused) return; const m=openModal(`<h2>📋 My jobs</h2><ul class="tasks">${MISS.map(mm=>{ const r=S.results[mm.id]; return `<li><span>${r===true?'✅':r===false?'⚠️':'⬜'}</span><span>${esc(mm.hint||mm.name)}</span></li>`; }).join('')}<li><span>🔎</span><span>Find ${S.hazTotal} hidden dangers (tap LOOK when you see a ❓)</span></li></ul><button class="primary" id="cl">Close</button>`); m.querySelector('#cl').onclick=closeModal; };
 }
-function setHud(on){ ['hud','act','camBtn','guideBtn','voiceBtn','muteBtn','tasksBtn'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){ $('prompt').classList.add('hidden'); $('guidePanel').classList.add('hidden'); $('hint2').classList.add('hidden'); } }
+function setHud(on){ ['hud','act','camBtn','guideBtn','voiceBtn','muteBtn','setBtn','tasksBtn'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){ $('prompt').classList.add('hidden'); $('guidePanel').classList.add('hidden'); $('hint2').classList.add('hidden'); } }
 
 // ================== START ==================
 function showStart(){
@@ -1337,12 +1583,14 @@ function showStart(){
     <p class="muted" style="margin:.6em 0 .3em">Uniform colour and skin tone</p>
     <div class="row">${UNIS.map(c=>`<button class="sw ${c===kid.uni?'on':''}" data-u="${c}" style="background:${c}"></button>`).join('')}</div>
     <div class="row" style="margin-top:6px">${SKINS.map(c=>`<button class="sw ${c===kid.skin?'on':''}" data-s="${c}" style="background:${c}"></button>`).join('')}</div>
-    <div class="row" style="margin-top:14px"><button class="primary big2" id="start">Let's go! ▶</button></div>
+    ${SL.consent.html(true)}
+    <div class="row" style="margin-top:14px"><button class="primary big2" id="start">Let's go! ▶</button><button id="stSet">⚙️ Language &amp; settings</button></div>
     <p class="muted" style="font-size:.85rem;margin-top:10px">🎮 Drag the left side of the screen to walk, drag the right side to look. Questions pop up when you reach a yellow ring. Tap LOOK when you see a ❓. 🗣️ Questions are read aloud.</p>`);
   m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ kid.sex=b.dataset.x; m.querySelectorAll('[data-x]').forEach(x=>x.classList.toggle('primary',x===b)); });
   m.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{ kid.uni=b.dataset.u; m.querySelectorAll('[data-u]').forEach(x=>x.classList.toggle('on',x===b)); });
   m.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{ kid.skin=b.dataset.s; m.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b)); });
-  m.querySelector('#start').onclick=()=>{ ensureAudio(); kid.name=(m.querySelector('#nm').value.trim()||'Safety Star').slice(0,24); resetDynamic(); started=true; closeModal(); setHud(true);
+  SL.consent.bind(m,null); m.querySelector('#stSet').onclick=()=>openSettings(showStart);
+  m.querySelector('#start').onclick=()=>{ if(!SL.consent.ok()){ const c=m.querySelector('.consent'); c.style.outline='3px solid var(--bad)'; c.scrollIntoView({block:'center'}); toast(tr('Please ask a parent or teacher to tick the privacy box.'),'bad'); return; } ensureAudio(); kid.name=(m.querySelector('#nm').value.trim()||'Safety Star').slice(0,24); resetDynamic(); started=true; closeModal(); setHud(true);
     toast(WORLD==='home'?'☀️ Good morning, '+kid.name+'! Follow Mummy and the yellow arrows.':'🏫 Welcome to school, '+kid.name+'! Follow your teacher and the yellow arrows.'); speak(DATA.intro); };
 }
 window.addEventListener('load',()=>{

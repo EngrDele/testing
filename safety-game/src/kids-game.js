@@ -1,7 +1,7 @@
 // ================== KIDS GAME (home→bus, school) ==================
 const PARAMS = new URLSearchParams(location.search);
 const WORLD = PARAMS.get('world')==='school' ? 'school' : 'home';
-let S=null, paused=true, started=false, guideOn=true, voiceOn=true, firstPerson=false, muted=false, audio=null;
+let S=null, paused=true, started=false, guideOn=true, firstPerson=false, muted=false, audio=null;
 let yaw=0, pitch=.42; const keys={}; let joy=null, look=null;
 const kid = {name:'', sex:'f', skin:'#5a3825', uni:'#1f4e8c'};
 const SKINS=['#3b2416','#5a3825','#7b4a2e','#a0663f'], UNIS=['#1f4e8c','#7a1f2b','#1f6b3a','#6b4f8a','#c46a12'];
@@ -11,7 +11,7 @@ function ensureAudio(){ if(!audio){ try{ audio=new (window.AudioContext||window.
 function beep(f=880,d=.12,type='square',v=.05){ if(muted||!audio) return; try{ const o=audio.createOscillator(), g=audio.createGain(); o.type=type; o.frequency.value=f; o.connect(g); g.connect(audio.destination); const t=audio.currentTime; g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(.0001,t+d); o.start(t); o.stop(t+d);}catch(e){} }
 const chime=()=>{ beep(660,.12,'sine',.08); setTimeout(()=>beep(990,.18,'sine',.08),110); setTimeout(()=>beep(1320,.2,'sine',.06),230); };
 const buzz=()=>beep(150,.35,'sawtooth',.06);
-function speak(text){ if(!voiceOn||muted||!window.speechSynthesis) return; try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu,'')); const vs=speechSynthesis.getVoices(); u.voice=vs.find(v=>/en-NG/i.test(v.lang))||vs.find(v=>/en-GB/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null; u.rate=.95; u.pitch=1.05; speechSynthesis.speak(u);}catch(e){} }
+function speak(text){ if(muted) return; SL.speak(tr(text)); }
 
 // ---------- UI ----------
 function toast(msg,kind=''){ const d=document.createElement('div'); d.className='tst '+kind; d.textContent=msg; $('toast').appendChild(d); setTimeout(()=>d.remove(),3600); while($('toast').children.length>2) $('toast').firstChild.remove(); }
@@ -116,8 +116,8 @@ function ask(m, onDone){
   const q=m.q; const opts=shuffle(q.o.map((o,i)=>({o,i})));
   const mm=openModal(`<div class="who"><span class="av">${q.e}</span><div><div class="muted" style="font-size:.85rem">${esc(q.who)}</div><h2>${esc(m.name)}</h2></div><button class="spk" id="spk" title="Read aloud">🔊</button></div>
     <p class="qt">${esc(q.text)}</p><div class="opts">${opts.map(({o,i})=>`<button data-i="${i}">${esc(o.t)}</button>`).join('')}</div><div id="fb"></div>`);
-  speak(q.text+'. '+opts.map(({o},k)=>'Option '+(k+1)+': '+o.t).join('. '));
-  mm.querySelector('#spk').onclick=()=>{ const v=voiceOn; voiceOn=true; speak(q.text); voiceOn=v; };
+  speak(tr(q.text)+'. '+opts.map(({o},k)=>tr('Option')+' '+(k+1)+': '+tr(o.t)).join('. '));
+  mm.querySelector('#spk').onclick=()=>{ const v=SL.settings.voice; SL.settings.voice=true; speak(q.text); SL.settings.voice=v; };
   mm.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{
     const o=q.o[+b.dataset.i]; mm.querySelectorAll('[data-i]').forEach(x=>x.disabled=true);
     if(o.ok){ S.stars++; chime(); } else { buzz(); S.mistakes.push({where:m.name,why:o.why}); if(o.heart) loseHeart(); }
@@ -150,7 +150,7 @@ function interactables(){
 function inspect(it){
   const m=openModal(`<div class="who"><span class="av">${it.e}</span><h2>Look closely</h2><button class="spk" id="spk">🔊</button></div><p class="qt">You see: <b>${esc(it.t)}</b></p>
     <div class="opts"><button id="r1">⚠️ That is dangerous! Tell an adult</button><button id="r2">👍 That is safe</button></div><div id="fb"></div>`);
-  speak('You see: '+it.t+'. Is it dangerous or safe?'); m.querySelector('#spk').onclick=()=>{ const v=voiceOn; voiceOn=true; speak(it.t); voiceOn=v; };
+  speak(tr('You see:')+' '+tr(it.t)+'. '+tr('Is it dangerous or safe?')); m.querySelector('#spk').onclick=()=>{ const v=SL.settings.voice; SL.settings.voice=true; speak(it.t); SL.settings.voice=v; };
   const fin=(rep)=>{ m.querySelectorAll('.opts button').forEach(b=>b.disabled=true); let ok=true,msg;
     if(it.h&&rep){ S.hazFound++; S.stars++; msg='Well spotted! You found a danger. ⭐'; }
     else if(it.h){ ok=false; S.mistakes.push({where:'Danger missed',why:'"'+it.t+'" is dangerous. Always tell an adult.'}); msg='Oh no! That is dangerous. Always tell an adult.'; }
@@ -236,7 +236,7 @@ function endGame(win){
   const level = !win? '' : S.stars>=total-2 ? 'GOLD' : S.stars>=total-6 ? 'SILVER' : 'BRONZE';
   const txt=`${DATA.title.toUpperCase()} – SAFETY STAR\nName: ${kid.name}\nResult: ${win?level+' ⭐ '+S.stars+' stars':'Try again'}\nDangers found: ${S.hazFound}/${S.hazTotal}\nDate: ${new Date().toLocaleString()}`;
   win?chime():buzz();
-  if(/^https?:$/.test(location.protocol) && !/claude\.ai|claudeusercontent/.test(location.hostname)) fetch('api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:WORLD,name:kid.name,role:'Pupil',result:win?level:'TRY AGAIN',hazards:S.hazFound+'/'+S.hazTotal,mistakes:S.mistakes.length,where:[...new Set(S.mistakes.map(x=>x.where))],stars:S.stars,date:new Date().toLocaleString()})}).catch(()=>{});
+  SL.post({game:WORLD,name:kid.name,role:'Pupil',result:win?level:'TRY AGAIN',hazards:S.hazFound+'/'+S.hazTotal,mistakes:S.mistakes.length,where:[...new Set(S.mistakes.map(x=>x.where))],stars:S.stars,date:new Date().toLocaleString()});
   const m=openModal(`<h1 style="margin:.1em 0">${win?'🎉 You did it!':'😮 Oops! Let\'s try again'}</h1>
     ${win?`<div class="cert"><div class="big">🏅 ${level} SAFETY STAR</div><div class="muted">${esc(DATA.title)}</div><div class="nm">${esc(kid.name)}</div><div>⭐ ${S.stars} stars · 🔎 ${S.hazFound}/${S.hazTotal} dangers found · ❤️ ${S.hearts} hearts left</div><div class="muted">${new Date().toLocaleDateString()}</div></div>`
           :`<p class="qt">You ran out of hearts. Every mistake is a chance to learn!</p>`}
@@ -370,8 +370,8 @@ function initScene(){
     wall:(()=>{ const m=std('#efe6d2',{r:.92}); m.map=tex(TX.plaster,1,1); return m; })(), wall2:(()=>{ const m=std('#cfe0ef',{r:.92}); m.map=tex(TX.plaster,1,1); return m; })(), wall3:(()=>{ const m=std('#f3d9b1',{r:.92}); m.map=tex(TX.plaster,1,1); return m; })(), block:(()=>{ const m=std('#efe6d2',{r:.92}); m.map=tex(TX.block,3,1); m.normalMap=tex(TX.blockN,3,1,false); return m; })(), cope:std('#cfc8b8',{r:.9}) };
   if(WORLD==='home') buildHome(scene); else buildSchool(scene);
   // markers, items, escort, player
-  const ringM=new THREE.MeshBasicMaterial({color:'#ffd400',transparent:true,opacity:.75,depthWrite:false});
-  const markers=MISS.filter(m=>m.r).map(m=>{ const ring=new THREE.Mesh(new THREE.RingGeometry(.5,.68,32),ringM.clone()); ring.rotation.x=-Math.PI/2; ring.position.set(X(m.x),.03,Z(m.y)); scene.add(ring); const s=labelSprite('!',.36); s.material.color=new THREE.Color('#ffe14d'); s.position.set(X(m.x),2.1,Z(m.y)); scene.add(s); return {m,ring,s}; });
+  const ringM=new THREE.MeshBasicMaterial({color:SL.markerColor(),transparent:true,opacity:.75,depthWrite:false});
+  const markers=MISS.filter(m=>m.r).map(m=>{ const ring=new THREE.Mesh(new THREE.RingGeometry(.5,.68,32),ringM.clone()); ring.rotation.x=-Math.PI/2; ring.position.set(X(m.x),.03,Z(m.y)); scene.add(ring); const s=labelSprite('!',.36); s.material.color=new THREE.Color(SL.markerColor()); s.position.set(X(m.x),2.1,Z(m.y)); scene.add(s); return {m,ring,s}; });
   const chev=new THREE.Shape([[-.3,-.22],[0,.12],[.3,-.22],[.3,-.05],[0,.3],[-.3,-.05]].map(([x,y])=>new THREE.Vector2(x,y))); const cg=new THREE.ShapeGeometry(chev); cg.rotateX(-Math.PI/2);
   const arrows=new THREE.InstancedMesh(cg,new THREE.MeshBasicMaterial({color:'#ffd21a',transparent:true,opacity:.9,depthWrite:false,toneMapped:false}),60); arrows.frustumCulled=false; arrows.count=0; scene.add(arrows);
   const escort=makeHuman({...DATA.escort.look, label:DATA.escort.label, topMap: DATA.escort.look.topMap? ankara('#c0392b','#f1c40f','#1abc9c'):null, gele: DATA.escort.look.gele? ankara('#f1c40f','#c0392b','#ffffff'):null}); scene.add(escort);
@@ -379,8 +379,18 @@ function initScene(){
   const smoke=[]; if(WORLD==='school'){ const st=SMOKE_TEX(); for(let i=0;i<30;i++){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:st,transparent:true,depthWrite:false,opacity:.85,color:lin('#555')})); s.userData={a:Math.random()*Math.PI*2,r:Math.sqrt(Math.random()),h:Math.random()}; s.visible=false; scene.add(s); smoke.push(s);} }
   flushInst(scene);
   G={renderer,scene,camera,sun,markers,arrows,escort,smoke,player:null,items:[],veh:[],shake:0};
-  addEventListener('resize',resize3D); resize3D();
+  addEventListener('resize',resize3D); resize3D(); applyQuality();
+  SL.fps.cb=()=>{ applyQuality(); toast(tr('Graphics set to Low to keep the game smooth on this device. Change it in ⚙️ Settings.')); };
 }
+
+function applyQuality(){
+  if(!G) return; const q=SL.quality(), r=G.renderer;
+  r.setPixelRatio(q==='low'?Math.min(1,devicePixelRatio||1)*.8:q==='medium'?1:Math.min(1.5,devicePixelRatio||1)); resize3D();
+  const shadows=q!=='low'; if(r.shadowMap.enabled!==shadows){ r.shadowMap.enabled=shadows; G.scene.traverse(o=>{ if(o.material) [].concat(o.material).forEach(m=>m.needsUpdate=true); }); }
+  G.scene.traverse(o=>{ if(o.userData&&o.userData.decor) o.visible=q!=='low'; });
+}
+function applyMarkerColor(){ if(!G) return; const c=new THREE.Color(SL.markerColor()); G.markers.forEach(m=>{ m.ring.material.color.copy(c); m.s.material.color.copy(c); }); G.arrows.material.color.set(SL.settings.cb?'#1f77ff':'#ffd21a'); }
+function openSettings(after){ SL.openSettings(openModal, ()=>{ closeModal(); after&&after(); }, k=>{ if(k==='lang'){ const u=new URL(location.href); u.searchParams.set('lang',SL.lang); location.href=u.href; } if(k==='quality') applyQuality(); if(k==='cb') applyMarkerColor(); }); }
 function resize3D(){ if(!G) return; G.renderer.setSize(innerWidth,innerHeight,false); G.camera.aspect=innerWidth/innerHeight; G.camera.fov=innerWidth<innerHeight?70:60; G.camera.updateProjectionMatrix(); }
 function makeKid(){
   const g=makeHuman({sex:kid.sex, skin:kid.skin, top:kid.sex==='f'?'#ffffff':'#f5f5f5', bottom:kid.uni, dress:kid.sex==='f', outfit:kid.sex==='f'?'dress':'shirt', topMap:kid.sex==='f'?mkCanvas(64,64,(c)=>{ c.fillStyle=kid.uni; c.fillRect(0,0,64,64); c.fillStyle='rgba(255,255,255,.25)'; c.fillRect(0,0,64,6); }):null,
@@ -439,7 +449,7 @@ function buildHome(scene){
   // compound
   place(scene,F.generator(),845,330,0,[50,30]); place(scene,F.well(),200,600,0,[80,80]); place(scene,F.car('#2e4053'),690,600,Math.PI/2,[100,46]);
   for(const [x,z] of [[80,640],[860,80],[80,80]]) place(scene,F.tree(),x,z,0,[20,20]);
-  for(let x=-300;x<1900;x+=260) place(scene,F.palm(),x,1100,0);
+  for(let x=-300;x<1900;x+=260) place(scene,F.palm(),x,1100,0).userData.decor=true;
   // NPCs
   G_NPC.push({look:{sex:'m',skin:'#3d2416',top:'#5d6d7e',bottom:'#2a2f3a',longSleeve:true,beard:true,label:'Stranger'},x:450,y:745,face:0});
   G_NPC.push({look:{sex:'f',skin:'#3b2416',top:'#f2f2f2',bottom:'#1f2a40',vest:true,vestColor:'#ff7a00',hat:'cap',hatColor:'#ffffff',label:'Crossing guard',longSleeve:true},x:880,y:770,face:Math.PI/2,lolly:true});
@@ -488,7 +498,7 @@ function buildSchool(scene){
   const bus=F.bus(); place(scene,bus,1250,990,Math.PI/2,[190,52]);
   // trees
   for(const [x,y] of [[80,1000],[1440,560],[560,560],[960,820],[80,560]]) place(scene,F.tree(),x,y,0,[20,20]);
-  for(let x=-300;x<1900;x+=260) place(scene,F.palm(),x,1230,0);
+  for(let x=-300;x<1900;x+=260) place(scene,F.palm(),x,1230,0).userData.decor=true;
   // NPCs
   G_NPC.push({look:{sex:'m',skin:'#3b2416',top:'#2b3f66',bottom:'#1f2a40',hat:'cap',hatColor:'#1b2538',longSleeve:true,beard:true,label:'Gatekeeper'},x:840,y:1030,face:Math.PI});
   G_NPC.push({look:{sex:'m',skin:'#5a3825',top:'#555',bottom:'#222',longSleeve:true,label:'Stranger'},x:700,y:1130,face:0});
@@ -538,7 +548,7 @@ function drawHUD(){
 
 // ================== LOOP & INPUT ==================
 let last=performance.now(), hudT=0;
-function loop(now){ const dt=Math.min(.05,(now-last)/1000); last=now; if(G&&S){ if(!started) renderIntro(now/1000); else { if(!paused&&!S.over) update(dt); render3D(dt); hudT+=dt; if(hudT>.12){ hudT=0; drawHUD(); } } } requestAnimationFrame(loop); }
+function loop(now){ const dt=Math.min(.05,(now-last)/1000); last=now; if(G&&S){ if(!started) renderIntro(now/1000); else { if(!paused) SL.fps.tick(dt); if(!paused&&!S.over) update(dt); render3D(dt); hudT+=dt; if(hudT>.12){ hudT=0; drawHUD(); } } } requestAnimationFrame(loop); }
 addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT'||paused) return; keys[e.code]=true; if(e.code==='KeyE'||e.code==='Space'||e.code==='Enter'){ e.preventDefault(); doAct(); } if(e.code==='KeyV') firstPerson=!firstPerson; if(e.code.startsWith('Arrow')) e.preventDefault(); });
 addEventListener('keyup',e=>{ keys[e.code]=false; });
 function bindInput(){ const cv=$('game');
@@ -547,11 +557,13 @@ function bindInput(){ const cv=$('game');
   const end=e=>{ if(joy&&e.pointerId===joy.id){ joy=null; $('joy').classList.add('hidden'); } if(look&&e.pointerId===look.id) look=null; }; cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
   $('act').onclick=doAct; $('camBtn').onclick=()=>{ if(!paused) firstPerson=!firstPerson; };
   $('guideBtn').onclick=()=>{ guideOn=!guideOn; $('guideBtn').textContent='🧭 Guide: '+(guideOn?'ON':'OFF'); };
-  $('voiceBtn').onclick=()=>{ voiceOn=!voiceOn; $('voiceBtn').textContent=voiceOn?'🗣️ Voice: ON':'🗣️ Voice: OFF'; if(!voiceOn) try{ speechSynthesis.cancel(); }catch(e){} };
+  const vb=()=>{ $('voiceBtn').textContent=SL.settings.voice?'🗣️ Voice: ON':'🗣️ Voice: OFF'; }; vb();
+  $('voiceBtn').onclick=()=>{ SL.settings.voice=!SL.settings.voice; SL.store.set('settings',SL.settings); vb(); if(!SL.settings.voice) SL.stopSpeak(); };
+  $('setBtn').onclick=()=>{ if(!paused) openSettings(); };
   $('muteBtn').onclick=()=>{ muted=!muted; $('muteBtn').textContent=muted?'🔇':'🔊'; };
   $('tasksBtn').onclick=()=>{ if(paused) return; const m=openModal(`<h2>📋 My jobs</h2><ul class="tasks">${MISS.map(mm=>{ const r=S.results[mm.id]; return `<li><span>${r===true?'✅':r===false?'⚠️':'⬜'}</span><span>${esc(mm.hint||mm.name)}</span></li>`; }).join('')}<li><span>🔎</span><span>Find ${S.hazTotal} hidden dangers (tap LOOK when you see a ❓)</span></li></ul><button class="primary" id="cl">Close</button>`); m.querySelector('#cl').onclick=closeModal; };
 }
-function setHud(on){ ['hud','act','camBtn','guideBtn','voiceBtn','muteBtn','tasksBtn'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){ $('prompt').classList.add('hidden'); $('guidePanel').classList.add('hidden'); $('hint2').classList.add('hidden'); } }
+function setHud(on){ ['hud','act','camBtn','guideBtn','voiceBtn','muteBtn','setBtn','tasksBtn'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){ $('prompt').classList.add('hidden'); $('guidePanel').classList.add('hidden'); $('hint2').classList.add('hidden'); } }
 
 // ================== START ==================
 function showStart(){
@@ -563,12 +575,14 @@ function showStart(){
     <p class="muted" style="margin:.6em 0 .3em">Uniform colour and skin tone</p>
     <div class="row">${UNIS.map(c=>`<button class="sw ${c===kid.uni?'on':''}" data-u="${c}" style="background:${c}"></button>`).join('')}</div>
     <div class="row" style="margin-top:6px">${SKINS.map(c=>`<button class="sw ${c===kid.skin?'on':''}" data-s="${c}" style="background:${c}"></button>`).join('')}</div>
-    <div class="row" style="margin-top:14px"><button class="primary big2" id="start">Let's go! ▶</button></div>
+    ${SL.consent.html(true)}
+    <div class="row" style="margin-top:14px"><button class="primary big2" id="start">Let's go! ▶</button><button id="stSet">⚙️ Language &amp; settings</button></div>
     <p class="muted" style="font-size:.85rem;margin-top:10px">🎮 Drag the left side of the screen to walk, drag the right side to look. Questions pop up when you reach a yellow ring. Tap LOOK when you see a ❓. 🗣️ Questions are read aloud.</p>`);
   m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ kid.sex=b.dataset.x; m.querySelectorAll('[data-x]').forEach(x=>x.classList.toggle('primary',x===b)); });
   m.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{ kid.uni=b.dataset.u; m.querySelectorAll('[data-u]').forEach(x=>x.classList.toggle('on',x===b)); });
   m.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{ kid.skin=b.dataset.s; m.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b)); });
-  m.querySelector('#start').onclick=()=>{ ensureAudio(); kid.name=(m.querySelector('#nm').value.trim()||'Safety Star').slice(0,24); resetDynamic(); started=true; closeModal(); setHud(true);
+  SL.consent.bind(m,null); m.querySelector('#stSet').onclick=()=>openSettings(showStart);
+  m.querySelector('#start').onclick=()=>{ if(!SL.consent.ok()){ const c=m.querySelector('.consent'); c.style.outline='3px solid var(--bad)'; c.scrollIntoView({block:'center'}); toast(tr('Please ask a parent or teacher to tick the privacy box.'),'bad'); return; } ensureAudio(); kid.name=(m.querySelector('#nm').value.trim()||'Safety Star').slice(0,24); resetDynamic(); started=true; closeModal(); setHud(true);
     toast(WORLD==='home'?'☀️ Good morning, '+kid.name+'! Follow Mummy and the yellow arrows.':'🏫 Welcome to school, '+kid.name+'! Follow your teacher and the yellow arrows.'); speak(DATA.intro); };
 }
 window.addEventListener('load',()=>{

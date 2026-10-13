@@ -90,11 +90,13 @@ function signCanvas(kind, title, sub=''){
   });
 }
 function boardCanvas(text,bg='#12355b',fg='#ffffff'){
+  if(typeof tr==='function') text=tr(text);
   const m=mkCanvas(10,10).getContext('2d'); m.font='bold 64px system-ui'; const tw=m.measureText(text).width;
   return mkCanvas(Math.ceil(tw+80),110,(c,w,h)=>{ c.fillStyle=bg; c.fillRect(0,0,w,h); c.fillStyle='rgba(255,255,255,.08)'; c.fillRect(0,0,w,h/2);
     c.strokeStyle='#c9c9c9'; c.lineWidth=6; c.strokeRect(3,3,w-6,h-6); c.fillStyle=fg; c.font='bold 64px system-ui'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(text,w/2,h/2+3); });
 }
 function labelSprite(text,h=.28){
+  if(typeof tr==='function') text=tr(text);
   const m=mkCanvas(10,10).getContext('2d'); m.font='600 40px system-ui'; const tw=Math.ceil(m.measureText(text).width)+30;
   const c=mkCanvas(tw,60,(x,w,hh)=>{ x.fillStyle='rgba(15,20,25,.6)'; x.beginPath(); x.moveTo(14,0); x.arcTo(w,0,w,hh,14); x.arcTo(w,hh,0,hh,14); x.arcTo(0,hh,0,0,14); x.arcTo(0,0,w,0,14); x.fill(); x.fillStyle='#fff'; x.font='600 40px system-ui'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(text,w/2,hh/2+2); });
   const t=tex(c); const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,toneMapped:false,depthWrite:false})); s.scale.set(h*tw/60,h,1); return s;

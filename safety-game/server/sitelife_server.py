@@ -16,6 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GAME_DIR = os.environ.get("GAME_DIR", os.path.dirname(HERE))
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(HERE, "data"))
 HSE_KEY = os.environ.get("HSE_KEY", "")
+RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "365"))  # results older than this are deleted (NDPA 2023)
 PORT = int(os.environ.get("PORT", "8080"))
 HOST = os.environ.get("HOST", "0.0.0.0")
 RESULTS = os.path.join(DATA_DIR, "results.jsonl")
@@ -27,6 +28,31 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 def clean(v, n=120):
     return str(v if v is not None else "").replace("\n", " ").replace("\r", " ")[:n]
+
+
+def purge(now=None):
+    """Delete results older than RETENTION_DAYS. Returns how many were removed."""
+    if RETENTION_DAYS <= 0 or not os.path.exists(RESULTS):
+        return 0
+    cutoff = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime((now or time.time()) - RETENTION_DAYS * 86400))
+    with LOCK:
+        rows = load()
+        keep = [r for r in rows if str(r.get("received", "")) >= cutoff]
+        if len(keep) != len(rows):
+            tmp = RESULTS + ".tmp"
+            with open(tmp, "w", encoding="utf8") as f:
+                for r in keep:
+                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            os.replace(tmp, RESULTS)
+        return len(rows) - len(keep)
+
+
+def purge_loop():
+    while True:
+        n = purge()
+        if n:
+            print(f"Retention: deleted {n} result(s) older than {RETENTION_DAYS} days")
+        time.sleep(6 * 3600)
 
 
 def load():
@@ -157,4 +183,5 @@ if __name__ == "__main__":
     if not HSE_KEY:
         print("WARNING: HSE_KEY is not set, so the dashboard is disabled. Set HSE_KEY=yourSecret.")
     print(f"Serving {GAME_DIR} on http://{HOST}:{PORT}  (dashboard: /hse?key=...)")
+    threading.Thread(target=purge_loop, daemon=True).start()
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

@@ -26,7 +26,7 @@ const step = (p, n, code) => p.evaluate(([n, code]) => { if (code) (new Function
 
 async function factory(browser) {
   const p = await page(browser, BASE + 'index.html');
-  await p.fill('#nm', 'Test Player'); await p.fill('#co', 'QA Ltd'); await p.click('#spin'); await p.waitForTimeout(1500); await p.click('#start'); await p.waitForTimeout(300);
+  await p.fill('#nm', 'Test Player'); await p.fill('#co', 'QA Ltd'); await p.check('#slConsent'); await p.click('#spin'); await p.waitForTimeout(1500); await p.click('#start'); await p.waitForTimeout(300);
   const okTexts = await p.evaluate(() => [...Object.values(SC), ...Object.values(EVENTS)].flatMap(s => s.o.filter(o => o.ok).map(o => o.t)));
   async function resolve() {
     for (let k = 0; k < 8; k++) {
@@ -56,7 +56,7 @@ async function factory(browser) {
 
 async function kids(browser, world) {
   const p = await page(browser, BASE + 'kids.html?world=' + world);
-  await p.fill('#nm', 'Ada'); await p.click('#start'); await p.waitForTimeout(300);
+  await p.fill('#nm', 'Ada'); await p.check('#slConsent'); await p.click('#start'); await p.waitForTimeout(300);
   const okT = await p.evaluate(() => MISS.filter(m => m.q).flatMap(m => m.q.o.filter(o => o.ok).map(o => o.t)));
   async function resolve() {
     for (let k = 0; k < 8; k++) {

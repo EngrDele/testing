@@ -62,6 +62,18 @@ input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);
 .ppe-grid button .e{font-size:30px}
 .ppe-grid button.on{border:2px solid var(--brand);background:color-mix(in srgb,var(--brand) 14%,var(--chip))}
 #muteBtn{left:12px;bottom:22px;opacity:.9}
+#setBtn{left:66px;bottom:22px;opacity:.9}
+html{font-size:calc(15px * var(--fs,1))}
+body,.modal,button,input{font-size:1rem}
+input[type=checkbox]{width:auto;margin-right:6px;vertical-align:middle}
+.modal label{cursor:pointer}
+.consent{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--chip);border:1px solid var(--line);font-size:.9rem}
+.consent label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.consent input{width:auto;margin-top:3px}
+.consent details{margin-top:6px}.consent summary{cursor:pointer;color:var(--muted)}
+#slCaption{position:fixed;left:50%;bottom:210px;transform:translateX(-50%);z-index:9;max-width:min(92vw,640px);background:rgba(0,0,0,.78);color:#fff;padding:8px 14px;border-radius:10px;font-size:1rem;line-height:1.35;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
+#slCaption.on{opacity:1}
+select{font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink)}
+.course{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.course button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;font-size:.85rem}.course button small{color:var(--muted)}.course button.on{border:2px solid var(--brand)}
 #prompt{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:5;background:var(--hud);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-weight:600;pointer-events:none;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
 #joy{position:fixed;z-index:4;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.6);background:rgba(255,255,255,.15);pointer-events:none;transform:translate(-50%,-50%)}
 #joy i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px;border-radius:50%;background:rgba(255,255,255,.75)}
@@ -116,6 +128,7 @@ table{width:100%;border-collapse:collapse;font-size:.82rem}td,th{border-bottom:1
 <button id="guideBtn" class="fbtn hidden">🧭 Guide: ON</button>
 <div id="guidePanel" class="hidden"><span id="gArrow">⬆</span><span id="gText"></span></div>
 <button id="muteBtn" class="fbtn hidden">🔊</button>
+<button id="setBtn" class="fbtn hidden" title="Settings">⚙️</button>
 <div id="timer" class="hidden"></div>
 <div id="alarmv" class="alarmv hidden"></div>
 <div id="ovl"></div>
@@ -123,6 +136,7 @@ table{width:100%;border-collapse:collapse;font-size:.82rem}td,th{border-bottom:1
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
 <script>
+/*@@COMMON@@*/
 // ================== DATA ==================
 const ROLES = [
   {id:'visitor', name:'Visitor', icon:'🧑‍💼', task:'Attend a meeting at Admin and get to know the compound.'},
@@ -251,6 +265,7 @@ let S = null, profile = {name:'', company:'', role:null, shirt:SHIRTS[0], skin:S
 // Optional HSE contact baked into the link: ?hse=2348012345678&email=hse@company.com
 const QS=new URLSearchParams(location.search); const HSE_WA=(QS.get('hse')||'').replace(/[^0-9]/g,''); const HSE_MAIL=(QS.get('email')||'').trim();
 let autoQ = true;
+if(!SL.store.get('settings',null)) SL.settings.voice=false; // adults: read-aloud off by default (Settings to turn on)
 const keys = {}; let joy = null, look = null; let paused = true; let audio = null, muted = false;
 let yaw = 0, pitch = 0.25, firstPerson = false;
 const $ = id => document.getElementById(id);
@@ -302,6 +317,7 @@ function scenario(sc, label, onDone){
   const parts = sc.who.split(' ');
   const m = openModal(`<div class="who"><span class="av">${esc(parts[0])}</span><h2>${esc(parts.slice(1).join(' '))}</h2></div>
     <p>${esc(sc.text)}</p><div class="opts">${opts.map(({o,i})=>`<button data-i="${i}">${esc(o.t)}</button>`).join('')}</div><div id="fb"></div>`);
+  if(!muted) SL.speak(tr(sc.text));
   m.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{
     const o = sc.o[+b.dataset.i];
     m.querySelectorAll('[data-i]').forEach(x=>x.disabled=true);
@@ -543,16 +559,17 @@ function shareBlock(rec,pass){
 
 // ================== HSE RESULTS (shared store) ==================
 const cap = (name)=> (window.claude && window.claude.use) ? window.claude.use(name).catch(()=>null) : Promise.resolve(null);
-async function postServer(rec){ // results server (when hosted on our own server)
-  if(!/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent/.test(location.hostname)) return false;
-  try{ const r=await fetch('api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:'factory',...rec})}); return r.ok; }catch(e){ return false; }
+async function postServer(rec){ // our own server and/or Google Sheets (see SL.post); queued when offline
+  const r=await SL.post({game:'factory',...rec});
+  return r==='sent'?true:r==='queued'?'queued':false;
 }
 async function sendResult(rec){
   const el=()=>document.getElementById('hseSend'); const show=(t)=>{ if(el()) el().textContent=t; };
   try{
     const [db,user]=await Promise.all([cap('db'),cap('user')]);
     const uid = user ? await user.id() : null;
-    if(!db || !uid){ show(await postServer(rec) ? '✅ Your result has been sent to HSE.' : 'ℹ️ Use the WhatsApp or email button below to send your result to HSE.'); return; }
+    if(!SL.consent.ok()){ show('ℹ️ Your result was not sent because the privacy notice was not accepted.'); return; }
+    if(!db || !uid){ const r=await postServer(rec); show(r===true ? '✅ Your result has been sent to HSE.' : r==='queued' ? '📶 No connection. Your result will be sent to HSE automatically when you are back online.' : 'ℹ️ Use the WhatsApp or email button below to send your result to HSE.'); return; }
     const ref=db.doc('results/'+uid); const snap=await ref.get(); const old=snap.exists?snap.data():{};
     const attempts=[...(old.attempts||[]), rec].slice(-20);
     await ref.set({name:rec.name, role:rec.role, last:rec, attempts, passedEver: !!(old.passedEver || rec.result==='PASS'), updatedAt:Date.now()});
@@ -698,7 +715,6 @@ function update(dt){
 }
 function doAct(){ if(!paused && S && S.near){ ensureAudio(); S.near.run(); } }
 
-/*@@COMMON@@*/
 /*@@ENGINE@@*/
 // ---------- world build ----------
 function initThree(){
@@ -856,12 +872,12 @@ function initThree(){
   const palm=(x,z,h=7)=>{ const g=new THREE.Group(); const tr=cyl(.16,.24,h,trunkM,0,h/2,0,10); tr.rotation.z=rnd(-.08,.08); g.add(tr);
     for(let i=0;i<10;i++){ const fr=new THREE.Mesh(new THREE.PlaneGeometry(.7,3.2,1,4),frondM); const pos=fr.geometry.attributes.position; for(let k=0;k<pos.count;k++){ const yy=pos.getY(k); pos.setZ(k,-Math.pow((yy+1.6)/3.2,2)*1.3);} fr.geometry.computeVertexNormals();
       fr.position.set(0,h,0); fr.rotation.set(-1.0,i/10*Math.PI*2,0,'YXZ'); fr.translateY(1.4); fr.castShadow=true; g.add(fr); }
-    consolidate(g); g.position.set(x,0,z); scene.add(g); };
-  const shade=(x,z)=>{ const g=new THREE.Group(); g.add(cyl(.18,.26,2.4,trunkM,0,1.2,0,8)); for(let i=0;i<5;i++){ const c=mesh(new THREE.IcosahedronGeometry(rnd(1.1,1.6),1),leafM,rnd(-.8,.8),rnd(2.6,3.6),rnd(-.8,.8)); g.add(c);} consolidate(g); g.position.set(x,0,z); scene.add(g); };
+    consolidate(g); g.position.set(x,0,z); g.userData.decor=true; scene.add(g); };
+  const shade=(x,z)=>{ const g=new THREE.Group(); g.add(cyl(.18,.26,2.4,trunkM,0,1.2,0,8)); for(let i=0;i<5;i++){ const c=mesh(new THREE.IcosahedronGeometry(rnd(1.1,1.6),1),leafM,rnd(-.8,.8),rnd(2.6,3.6),rnd(-.8,.8)); g.add(c);} consolidate(g); g.position.set(x,0,z); g.userData.decor=true; scene.add(g); };
   for(let x=300;x<FENCE.r;x+=170) palm(X(x),Z(H-45),rnd(6,8));
   for(let y=760;y<880;y+=55) shade(X(1490),Z(y)); palm(X(1500),Z(1150),7); palm(X(270),Z(470),6.5);
   // across-the-street buildings & poles
-  for(let i=0;i<9;i++){ const w=rnd(10,16), h=rnd(4,10); const m=std(['#e8d9b8','#d7e3e8','#f0e0d0','#d9c9a8'][i%4],{r:.92}); m.map=tex(TX.plaster,w/4,h/4); scene.add(bx(w,h,10,m,-8+i*18,h/2,Z(H)+16)); }
+  for(let i=0;i<9;i++){ const w=rnd(10,16), h=rnd(4,10); const m=std(['#e8d9b8','#d7e3e8','#f0e0d0','#d9c9a8'][i%4],{r:.92}); m.map=tex(TX.plaster,w/4,h/4); const hb=bx(w,h,10,m,-8+i*18,h/2,Z(H)+16); hb.userData.decor=true; scene.add(hb); }
   const poleM=std('#6a5a48',{r:1}); const wire=new THREE.LineBasicMaterial({color:0x111111});
   const polePts=[]; for(let x=-10;x<W*K+20;x+=22){ scene.add(cyl(.12,.15,9,poleM,x,4.5,Z(H)+3.5,8)); scene.add(bx(1.6,.1,.1,poleM,x,8.5,Z(H)+3.5,false)); polePts.push(x); }
   for(const off of [-.7,0,.7]){ const pts=[]; polePts.forEach((x,i)=>{ pts.push(new THREE.Vector3(x,8.6,Z(H)+3.5+off)); if(i<polePts.length-1) pts.push(new THREE.Vector3(x+11,7.9,Z(H)+3.5+off)); }); scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),wire)); }
@@ -922,8 +938,8 @@ function initThree(){
     resetDynamic(){
       dyn.markers.forEach(m=>{scene.remove(m.s); scene.remove(m.ring);}); dyn.items.forEach(i=>scene.remove(i.g)); dyn.workers.forEach(w=>scene.remove(w)); if(dyn.bag) scene.remove(dyn.bag);
       dyn.markers=[]; dyn.items=[]; dyn.workers=[]; dyn.bag=null;
-      const ringM=new THREE.MeshBasicMaterial({color:'#ffd400',transparent:true,opacity:.7,depthWrite:false});
-      for(const z of ZONES){ if(!z.r) continue; const s=labelSprite('!',.42); s.material.color=new THREE.Color('#ffe14d'); s.position.set(X(z.x),2.6,Z(z.y)); scene.add(s);
+      const ringM=new THREE.MeshBasicMaterial({color:SL.markerColor(),transparent:true,opacity:.7,depthWrite:false});
+      for(const z of ZONES){ if(!z.r) continue; const s=labelSprite('!',.42); s.material.color=new THREE.Color(SL.markerColor()); s.position.set(X(z.x),2.6,Z(z.y)); scene.add(s);
         const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.7,32),ringM); ring.rotation.x=-Math.PI/2; ring.position.set(X(z.x),.03,Z(z.y)); scene.add(ring); dyn.markers.push({z,s,ring}); }
       for(const it of S.items){ const g=makeProp(it.e); g.position.set(X(it.x),0,Z(it.y)); g.rotation.y=rnd(0,Math.PI*2); scene.add(g);
         const glint=labelSprite('?',.3); glint.material.color=new THREE.Color('#ffffff'); glint.position.y=2.1; g.add(glint);
@@ -935,11 +951,27 @@ function initThree(){
       S.workers.forEach((w,i)=>{ const g=makeHuman({...looks[i%4],outfit:'coverall',vest:true,hat:'hard',hatColor:['#f6f6f2','#f1c40f','#1f6fd1'][i%3],longSleeve:true,boots:true,goggles:i%2===0,hair:looks[i%4].sex==='f'?'bun':'low'}); g.position.set(X(w.x),0,Z(w.y)); scene.add(g); dyn.workers.push(g); });
       const b=new THREE.Group(); b.add(bx(.4,.3,.18,std('#3b2b20',{r:.6}),0,.15,0)); b.add(bx(.3,.04,.04,std('#222'),0,.32,0)); b.position.set(X(430),0,Z(320)); scene.add(b); dyn.bag=b; },
   };
-  addEventListener('resize',resize3D); resize3D();
+  addEventListener('resize',resize3D); resize3D(); applyQuality(); applyMarkerColor();
+  SL.fps.cb=()=>{ applyQuality(); toast(tr('Graphics set to Low to keep the game smooth on this device. Change it in ⚙️ Settings.')); };
 }
 let BLOB=null, _smokeTex=null;
 function SMOKE_TEX(){ if(!_smokeTex) _smokeTex=tex(mkCanvas(128,128,(c)=>{ for(let i=0;i<6;i++){ const x=rnd(40,88),y=rnd(40,88),r=rnd(25,45); const g=c.createRadialGradient(x,y,2,x,y,r); g.addColorStop(0,'rgba(255,255,255,.55)'); g.addColorStop(1,'rgba(255,255,255,0)'); c.fillStyle=g; c.fillRect(0,0,128,128);} }),1,1); return _smokeTex; }
 function playerLook(){ return {sex:profile.sex, skin:profile.skin, top:profile.shirt, bottom:profile.sex==='f'?'#2b2b36':'#2a2f3a', hair:profile.sex==='f'?'braids':'low', vest:false, hat:null, longSleeve:false, collar:true, boots:false}; }
+
+// ---------- graphics quality & colour-blind markers (settings) ----------
+function applyQuality(){
+  if(!G) return; const q=SL.quality(), r=G.renderer;
+  r.setPixelRatio(q==='low'?Math.min(1,devicePixelRatio||1)*.8:q==='medium'?1:Math.min(1.5,devicePixelRatio||1)); resize3D();
+  const shadows=q!=='low'; if(r.shadowMap.enabled!==shadows){ r.shadowMap.enabled=shadows; G.scene.traverse(o=>{ if(o.material) [].concat(o.material).forEach(m=>m.needsUpdate=true); }); }
+  const sz=q==='high'?2048:1024; if(G.sun.shadow.mapSize.x!==sz){ G.sun.shadow.mapSize.set(sz,sz); if(G.sun.shadow.map){ G.sun.shadow.map.dispose(); G.sun.shadow.map=null; } }
+  G.scene.traverse(o=>{ if(o.userData && o.userData.decor) o.visible = q!=='low'; });
+  G.scene.fog.far = q==='low'?160:330;
+}
+function applyMarkerColor(){
+  if(!G||!G.dyn) return; const c=new THREE.Color(SL.markerColor());
+  G.dyn.markers.forEach(m=>{ if(m.ring) m.ring.material.color.copy(c); if(m.s) m.s.material.color.copy(c); });
+  if(G.arrows) G.arrows.material.color.set(SL.settings.cb?'#1f77ff':'#ffd21a');
+}
 function resize3D(){ if(!G) return; G.renderer.setSize(innerWidth,innerHeight,false); G.camera.aspect=innerWidth/innerHeight; G.camera.fov = innerWidth<innerHeight? 68 : 58; G.camera.updateProjectionMatrix(); }
 
 function applyWeather(){
@@ -1040,7 +1072,7 @@ function loop(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   if(G && S){
     if(!started) renderIntro(now/1000);
-    else { if(!paused && !S.over) update(dt); render3D(dt); hudT+=dt; if(hudT>0.12){hudT=0; drawHUD();} }
+    else { if(!paused) SL.fps.tick(dt); if(!paused && !S.over) update(dt); render3D(dt); hudT+=dt; if(hudT>0.12){hudT=0; drawHUD();} }
   }
   requestAnimationFrame(loop);
 }
@@ -1078,9 +1110,11 @@ $('camBtn').onclick=()=>{ if(!paused) toggleCam(); };
 $('guideBtn').onclick=()=>{ guideOn=!guideOn; guidePick=null; $('guideBtn').textContent='🧭 Guide: '+(guideOn?'ON':'OFF'); toast(guideOn?'🧭 Your HSE escort will lead you to the next task.':'Guide off. Explore on your own. Use 📱 Tasks if you get lost.'); };
 $('autoBtn').onclick=()=>{ autoQ=!autoQ; $('autoBtn').textContent='⚡ Auto: '+(autoQ?'ON':'OFF'); toast(autoQ?'⚡ Questions now pop up automatically when you reach a place.':'Auto off. Press the green button to talk.'); };
 $('muteBtn').onclick=()=>{ muted=!muted; $('muteBtn').textContent=muted?'🔇':'🔊'; };
+$('setBtn').onclick=()=>{ if(!paused) openSettings(); };
+function openSettings(after){ SL.openSettings(openModal, ()=>{ closeModal(); after&&after(); }, k=>{ if(k==='lang'){ const u=new URL(location.href); if(u.searchParams.has('lang')){ u.searchParams.set('lang',SL.lang); location.href=u.href; } else location.reload(); } if(k==='quality') applyQuality(); if(k==='cb') applyMarkerColor(); }); }
 
 // ================== START ==================
-function setHud(on){ ['hud','act','phoneBtn','camBtn','autoBtn','guideBtn','muteBtn','hint'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){$('guidePanel').classList.add('hidden');$('prompt').classList.add('hidden');$('timer').classList.add('hidden');$('alarmv').classList.add('hidden');} }
+function setHud(on){ ['hud','act','phoneBtn','camBtn','autoBtn','guideBtn','muteBtn','setBtn','hint'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){$('guidePanel').classList.add('hidden');$('prompt').classList.add('hidden');$('timer').classList.add('hidden');$('alarmv').classList.add('hidden');} }
 function showStart(){
   setHud(false); started=false; profile.role=null; newGame(); paused=true;
   const m=openModal(`<p class="muted" style="margin:0 0 6px;font-weight:700">Choose a game</p><div class="games"><span class="gcard on"><span class="gi">🏭</span><b>Factory Site Induction</b><small>Workers & visitors</small></span><a class="gcard" href="kids.html?world=home"><span class="gi">🏠🚌</span><b>Home → School Bus</b><small>Kids 6–12</small></a><a class="gcard" href="kids.html?world=school"><span class="gi">🏫</span><b>School Safety</b><small>Kids 6–12</small></a></div><h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
@@ -1094,9 +1128,12 @@ function showStart(){
     <div class="row" style="margin-top:6px">${SKINS.map(c=>`<button class="sw ${c===profile.skin?'on':''}" data-s="${c}" style="background:${c}" aria-label="skin tone"></button>`).join('')}</div>
     <p><b>Role lottery 🎲</b> <span class="muted">Like Lagos Life's birth lottery, you don't choose.</span></p>
     <div class="big" id="rolebox">🎲 ?</div><p class="muted" id="roletask"></p>
-    <div class="row" id="startRow"><button id="spin">Spin role</button><button class="primary" id="start" disabled>Start shift ▶</button></div>
+    ${SL.consent.html(false)}
+    <div class="row" id="startRow" style="margin-top:10px"><button id="spin">Spin role</button><button class="primary" id="start" disabled>Start shift ▶</button><button id="stSet">⚙️ Language &amp; settings</button></div>
     <p class="muted" style="font-size:.85rem;margin-top:12px">🎮 <b>Computer:</b> WASD to walk, drag the mouse to look, E to interact, V to switch first/third person.<br>📱 <b>Phone:</b> drag the left side of the screen to walk, drag the right side to look, and tap the green button to interact.</p>`);
   showDashButton(m.querySelector('#startRow'));
+  SL.consent.bind(m, null);
+  m.querySelector('#stSet').onclick=()=>openSettings(showStart);
   m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{profile.sex=b.dataset.x; m.querySelectorAll('[data-x]').forEach(x=>x.classList.toggle('primary',x===b));});
   m.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{profile.shirt=b.dataset.c; m.querySelectorAll('[data-c]').forEach(x=>x.classList.toggle('on',x===b));});
   m.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{profile.skin=b.dataset.s; m.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));});
@@ -1106,6 +1143,7 @@ function showStart(){
       if(++n>12){ clearInterval(t); m.querySelector('#roletask').textContent='📱 Task: '+profile.role.task; m.querySelector('#start').disabled=false; m.querySelector('#spin').disabled=false; chime(); } },90);
   };
   m.querySelector('#start').onclick=()=>{
+    if(!SL.consent.ok()){ const c=m.querySelector('.consent'); c.style.outline='3px solid var(--bad)'; c.scrollIntoView({block:'center'}); toast(tr('Please tick the privacy notice box to start.'),'bad'); return; }
     profile.name=(m.querySelector('#nm').value.trim()||'Guest').slice(0,40); profile.company=m.querySelector('#co').value.trim().slice(0,60);
     G.resetDynamic(); started=true; closeModal(); setHud(true);
     toast('🛵 The okada has dropped you at the Main Gate. Your HSE Escort will show you round. Follow the arrows.');
