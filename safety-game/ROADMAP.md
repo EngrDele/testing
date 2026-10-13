@@ -1,5 +1,28 @@
 # Site Life roadmap
 
+## Status (October 2026)
+All items below have a first version built, except 13 (real client scans: the `placeSiteModel` hook is ready, but needs a client's Polycam scan) and the native-speaker review of the Yorùbá, Hausa and Igbo drafts. Next steps for each are in **Next** lines. New game ideas live in `research/IDEAS.md`; a weekly routine researches and builds one.
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Privacy notice, consent, retention | ✅ Done |
+| 2 | Languages | ✅ Pidgin full; Yorùbá, Hausa, Igbo drafts (UI + kids) need native review and the factory questions |
+| 3 | Site file + builder | ✅ `sites/acme-ikeja.json`, `builder.html`. **Next:** let the builder move the gate, lane, car park and muster point |
+| 4 | Dashboard, certificates, verify, expiry | ✅ server; **Next:** same filters in the in-artifact dashboard |
+| 5 | Offline app | ✅ `sw.js`, manifest, IndexedDB queue |
+| 6 | Graphics settings | ✅ Low/Medium/High + auto; **Next:** low-poly `makeHuman` |
+| 7 | Advanced course | ✅ `?course=advanced` |
+| 8 | Oga Mode | ✅ `?mode=oga` |
+| 9 | Multiplayer | ✅ group code (server polling or artifact `room`); **Next:** voice chat, trainer view of everyone on the map |
+| 10 | More kids worlds | ✅ market, water, online |
+| 11 | Class / family codes | ✅ `?class=`, `/hse/class` |
+| 12 | glTF characters | 🟡 hook ready (`makeHumanGLTF`, `SL_AVATAR_URL`); needs licensed avatar files |
+| 13 | Real client sites | 🟡 hook ready (`placeSiteModel`); needs a scan |
+| 14 | VR | ✅ `XR` (untested on a real headset) |
+| 15 | SCORM | ✅ `python3 src/scorm.py` |
+| 16 | Cloudflare + Google Sheets | ✅ `deploy/` |
+| – | CI, Python server tests, accessibility, analytics | ✅ |
+
 Each item is written so an agent can pick it up as a task. Read `CLAUDE.md` first. Every task ends with: rebuild (`python3 src/build.py …`), run `bash tests/server-test.sh` and `node tests/playthrough.js`, and add or extend a test for the new behaviour.
 
 ## P1: Ready for a real pilot

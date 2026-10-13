@@ -76,8 +76,16 @@ jobs:
       - name: Server smoke tests
         run: bash tests/server-test.sh
 
-      - name: Browser playthroughs (factory, home, school)
+      - name: Browser playthroughs (every game, the builder)
         run: node tests/playthrough.js
+
+      - name: Accessibility, group session, offline app, SCORM and engine extras
+        run: |
+          node tests/a11y-test.js
+          node tests/room-test.js
+          node tests/offline-test.js
+          node tests/scorm-test.js
+          node tests/engine-extras-test.js
 
       - name: Upload test output
         if: failure()
