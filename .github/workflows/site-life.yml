@@ -1,0 +1,89 @@
+# Site Life (safety-game/) CI: rebuild check, server tests and full browser playthroughs.
+#
+# Playwright: there is deliberately no package.json in safety-game/ (the games have no npm dependencies).
+# The "Install Playwright" step runs `npm install --no-save --no-package-lock playwright@1` inside safety-game/,
+# which creates safety-game/node_modules (untracked) so that `require('playwright')` in tests/playthrough.js
+# resolves locally. Browsers are cached in PLAYWRIGHT_BROWSERS_PATH (Playwright's default location on Linux).
+name: Site Life
+
+on:
+  push:
+    paths:
+      - "safety-game/**"
+      - ".github/workflows/site-life.yml"
+  pull_request:
+    paths:
+      - "safety-game/**"
+      - ".github/workflows/site-life.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-life-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/ms-playwright
+      PYTHONDONTWRITEBYTECODE: "1"
+    defaults:
+      run:
+        working-directory: safety-game
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch three.js r128 + Sky.js into tests/vendor
+        run: bash tests/setup.sh
+
+      - name: Install Playwright (local node_modules, not committed)
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund playwright@1
+          node -e "console.log('playwright', require('playwright/package.json').version)"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('safety-game/node_modules/playwright-core/package.json') }}
+
+      - name: Install Chromium and its system libraries
+        run: npx playwright install --with-deps chromium
+
+      - name: Rebuild generated pages
+        run: python3 src/build.py tests/vendor/three.min.js tests/vendor/Sky.js
+
+      - name: Generated files must be committed (run src/build.py and commit if this fails)
+        run: |
+          git status --short
+          git diff --exit-code --stat
+
+      - name: Server unit tests
+        run: python3 -m unittest tests/test_server.py -v
+
+      - name: Server smoke tests
+        run: bash tests/server-test.sh
+
+      - name: Browser playthroughs (factory, home, school)
+        run: node tests/playthrough.js
+
+      - name: Upload test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-life-test-output
+          path: safety-game/tests/out/
+          if-no-files-found: ignore
+          retention-days: 14

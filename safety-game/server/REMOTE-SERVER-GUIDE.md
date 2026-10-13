@@ -37,7 +37,30 @@ HSE dashboard (private): https://12-34-56-78.sslip.io/hse?key=xxxxxxxx
 | Kids: School Safety | `https://YOUR-ADDRESS/kids.html?world=school` |
 | **HSE dashboard** (keep private) | `https://YOUR-ADDRESS/hse?key=YOUR-KEY` |
 
-The dashboard shows games played, people, pass rate, the most common mistakes and every result, and has a **CSV download** for Excel. It refreshes every minute.
+The dashboard shows games played, people, pass rate and every result, and has a **CSV download** for Excel. It refreshes every 2 minutes.
+- **Filters:** date range, company, game, result, class/family, name, and certificate status (valid, expiring within 30 days, expired). The CSV download uses the same filters.
+- **Where people struggle:** average time per zone, most-missed hazards and most-missed questions for the filtered results.
+- **Person history:** click a name to see all of that person's attempts.
+- **Class / family view:** kids results grouped by the code in the link (`kids.html?world=school&class=JSS1A`), with stars and each child's most common mistakes.
+- **Refresher reminders:** "expires soon" and "expired" badges, and two quick links at the top.
+
+### Certificates and verification
+| What | Link |
+|---|---|
+| Printable certificate (A4, with QR code) | `https://YOUR-ADDRESS/cert/ID` |
+| Check a certificate (the QR code opens this) | `https://YOUR-ADDRESS/verify/ID` |
+
+- Every result gets a short ID. Only passing results (PASS, GOLD, SILVER, BRONZE) get a certificate; open it from the **Certificate** link in the dashboard and press **Print or save as PDF**.
+- The certificate shows only name, company, training, result, date and expiry. The verify page shows **VALID** (green), **EXPIRED** (red) or **NOT FOUND**.
+- Certificates are valid for **12 months** by default. To change it, add `VALID_MONTHS=24` (for example) to `/etc/sitelife.env` and restart. Keep `RETENTION_DAYS` (default 365) at least as long as the validity, or old certificates will show NOT FOUND once their result is deleted.
+- The QR code is drawn by a small script from `cdnjs.cloudflare.com`; the verify link is also printed as text under it.
+
+### Live trainer room (multiplayer induction)
+1. The trainer opens `https://YOUR-ADDRESS/trainer`, types a room code (4–8 letters or numbers, for example `ACME1`) or clicks **New random room**.
+2. Send trainees the link shown on the page: `https://YOUR-ADDRESS/index.html?room=ACME1`.
+3. The trainer page lists everyone in the room live (zone and score) and has buttons to trigger **fire alarm, NEPA, spill, rain** or **end session** for everyone.
+
+Up to 30 players per room. Rooms are kept in memory only and disappear after 2 hours without activity or when the server restarts. Anyone who knows the room code can open the trainer page, so use a fresh code for each session.
 
 ## Useful commands (on the server)
 | Task | Command |
