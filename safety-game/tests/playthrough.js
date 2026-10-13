@@ -1,5 +1,5 @@
 // End-to-end playthrough of all three games in headless Chromium.
-// Usage (from safety-game/):  bash tests/setup.sh  &&  node tests/playthrough.js [factory|home|school ...]
+// Usage (from safety-game/):  bash tests/setup.sh  &&  node tests/playthrough.js [factory|advanced|oga|home|school|market|water|online ...]
 // Env: BASE_URL (default file://.../index.html dir), HEADED=1 to watch.
 // The games are driven by calling update() directly: software WebGL in CI renders ~1 fps,
 // so waiting on requestAnimationFrame is far too slow (see CLAUDE.md "Testing").
@@ -8,7 +8,7 @@ let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromiu
 const ROOT = path.resolve(__dirname, '..');
 const VENDOR = path.join(__dirname, 'vendor');
 const BASE = process.env.BASE_URL || 'file://' + ROOT + '/';
-const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'home', 'school'];
+const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'advanced', 'oga', 'home', 'school', 'market', 'water', 'online'];
 const LANG = process.env.GAME_LANG || '';               // e.g. GAME_LANG=pcm to play in Pidgin
 const withLang = (u) => LANG ? u + (u.includes('?') ? '&' : '?') + 'lang=' + LANG : u;
 const MISSES = new Set();                               // untranslated on-screen strings (written to tests/out/)
@@ -28,8 +28,9 @@ async function page(browser, url) {
 }
 const step = (p, n, code) => p.evaluate(([n, code]) => { if (code) (new Function(code))(); for (let i = 0; i < n && !paused && !S.over; i++) update(0.05); render3D(.05); drawHUD(); }, [n, code || null]);
 
-async function factory(browser) {
-  const p = await page(browser, BASE + 'index.html');
+async function factory(browser, q = '') {
+  const label = q ? 'factory' + q : 'factory';
+  const p = await page(browser, BASE + 'index.html' + q);
   await p.fill('#nm', 'Test Player'); await p.fill('#co', 'QA Ltd'); await p.check('#slConsent'); await p.click('#spin'); await p.waitForTimeout(1500); await p.click('#start'); await p.waitForTimeout(300);
   const okTexts = await p.evaluate(() => [...Object.values(SC), ...Object.values(EVENTS)].flatMap(s => s.o.filter(o => o.ok).map(o => o.t)));
   async function resolve() {
@@ -53,9 +54,33 @@ async function factory(browser) {
   const st = await p.evaluate(() => ({ zones: Object.keys(S.results).length, of: ZONES.length, haz: S.hazFound, over: S.over }));
   const title = await p.$eval('.modal h1', e => e.innerText).catch(() => '');
   await collectMisses(p);
-  console.log('factory', JSON.stringify(st), title);
-  if (!/passed/i.test(title) || st.zones !== st.of) fail('factory did not pass');
-  if (p.errs.length) fail('factory errors: ' + p.errs.join(' | '));
+  console.log(label, JSON.stringify(st), title);
+  if (!/passed/i.test(title) || st.zones !== st.of) fail(label + ' did not pass');
+  if (p.errs.length) fail(label + ' errors: ' + p.errs.join(' | '));
+  await p.close();
+}
+
+async function oga(browser) {
+  const p = await page(browser, BASE + 'index.html?mode=oga');
+  await p.fill('#nm', 'Oga Test'); await p.check('#slConsent'); await p.click('#start'); await p.waitForTimeout(300);
+  const okT = await p.evaluate(() => SITE.oga.incidents.flatMap(i => i.o.filter(o => o.ok).map(o => o.t)));
+  async function resolve() {
+    for (let k = 0; k < 6; k++) {
+      const bs = await p.$$('.modal [data-i]');
+      if (bs.length) { for (const b of bs) if (okT.includes(await b.innerText())) { await b.click(); break; } await p.click('#cont'); continue; }
+      break;
+    }
+  }
+  for (let i = 0; i < 40 && !(await p.evaluate(() => S.over)); i++) {
+    await step(p, 2, 'S.oga.next=0;');
+    for (const [x, y] of await p.evaluate(() => S.oga.active.map(a => [a.inc.x, a.inc.y]))) { await step(p, 2, `S.p.x=${x};S.p.y=${y + 20};`); await resolve(); }
+  }
+  const st = await p.evaluate(() => ({ log: S.oga.log.length, ok: S.oga.log.filter(l => l.ok).length, over: S.over }));
+  const title = await p.$eval('.modal h1', e => e.innerText).catch(() => '');
+  await collectMisses(p);
+  console.log('oga', JSON.stringify(st), title);
+  if (!/good oga/i.test(title) || st.ok !== st.log) fail('oga did not pass');
+  if (p.errs.length) fail('oga errors: ' + p.errs.join(' | '));
   await p.close();
 }
 
@@ -96,6 +121,8 @@ async function kids(browser, world) {
   const browser = await chromium.launch({ headless: !process.env.HEADED, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
     if (want.includes('factory')) await factory(browser);
+    if (want.includes('advanced')) await factory(browser, '?course=advanced');
+    if (want.includes('oga')) await oga(browser);
     for (const w of ['home', 'school']) if (want.includes(w)) await kids(browser, w);
   } catch (e) { fail(e.stack || e.message); }
   await browser.close();

@@ -52,7 +52,7 @@ input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);
 @media (max-width:600px){#guidePanel{bottom:120px;font-size:13px} #prompt{bottom:166px}}
 .btnlink{display:inline-block;text-decoration:none;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:10px 14px;font-weight:600}
 .btnlink.wa{background:#25D366;border-color:#1da851;color:#06290f}
-.games{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px;margin-bottom:12px}
 .gcard{display:flex;flex-direction:column;gap:2px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--chip);color:var(--ink);text-decoration:none;font-size:13px;line-height:1.25}
 .gcard .gi{font-size:24px}
 .gcard small{color:var(--muted)}
@@ -369,6 +369,7 @@ table{width:100%;border-collapse:collapse;font-size:.82rem}td,th{border-bottom:1
 
 </script>
 <script>
+const SL_I18N = {};
 // Site Life shared features for all games. Built into pages by src/build.py.
 // SL.consent  privacy notice and consent (NDPA 2023)
 // SL.t        translation with English fallback; SL.lang current language
@@ -420,7 +421,11 @@ const SL = (() => {
       if (d[body] != null) return s.replace(core, m[1] + d[body]);
       if (d[m[2]] != null) return s.replace(core, m[1] + d[m[2]] + m[3]);
     }
-    for (const p of PAT[lang] || []) { const mm = core.match(p.re); if (mm) return s.replace(core, p.out.replace(/\{(\d)\}/g, (_, i) => mm[+i + 1])); }
+    const sub = v => v.split(', ').map(x => { const d2 = I18N[lang] || {}; return d2[x] != null ? d2[x] : x; }).join(', ');
+    for (const p of PAT[lang] || []) {
+      const mm = core.match(p.re); if (mm) return s.replace(core, p.out.replace(/\{(\d)\}/g, (_, i) => sub(mm[+i + 1])));
+      if (m) { const m2 = (m[2] + m[3]).match(p.re); if (m2) return s.replace(core, m[1] + p.out.replace(/\{(\d)\}/g, (_, i) => sub(m2[+i + 1]))); }
+    }
     if (core.length > 2 && core.length < 400) misses.add(core);
     return s;
   }
@@ -604,115 +609,33 @@ const BARS = [
   {k:'eyes', n:'👁️', l:'Eyes'}, {k:'site', n:'🛡️', l:'Site'},
 ];
 
-const SC = {
-  gate:{who:'👮 Security', text:'An okada drops you at the gate. Your hands are full and you have no ID. Security says: "Go in, I know you."',
-    o:[{t:'Thank him and walk in', ok:false, fx:{site:-2}, why:'If you never sign in, nobody will know you are on site, so the muster count misses you in a fire.'},
-       {t:'Wait, sign the visitor register and collect a pass', ok:true, why:'Correct. Security controls who is inside so that everyone can be accounted for in an emergency.'}]},
-  reception:{who:'💁🏾‍♀️ Receptionist', text:'"Welcome! Here are your safety boots, hi-vis vest, hard hat, goggles and ear plugs." The boots are a bit tight.',
-    o:[{t:'Leave the PPE, "na only small time I go spend"', ok:false, fx:{site:-1}, ppe:false, why:'Accident no dey give notice. Without ear plugs and goggles, noisy areas will now damage your hearing.'},
-       {t:'Ask for the correct size and wear everything', ok:true, ppe:true, why:'Correct. PPE only works if you wear it, and it must fit. Your character is now wearing PPE.'}]},
-  admin:{who:'🏢 Admin stairs', text:'On the staircase, a cleaner has just mopped. There is no wet-floor sign and you are carrying files with both hands.',
-    o:[{t:'Rush down, you are late', ok:false, fx:{health:-3}, why:'Slips, trips and falls are among the most common workplace injuries. Hold the rail.'},
-       {t:'Hold the handrail, go slowly and tell the cleaner to put up a sign', ok:true, why:'Correct. You protected yourself and the next person.'}]},
-  canteen:{who:'👨🏾‍🍳 Cook', text:'You smell gas near the kitchen burners. The cook is about to strike a match: "Make I light am, food don late."',
-    o:[{t:'Ignore it, cooks know their work', ok:false, fx:{health:-3,site:-3}, why:'A gas leak plus a flame can cause an explosion.'},
-       {t:'Shout "STOP, no fire!", don\'t touch switches, open the windows, get people out and report it', ok:true, why:'Correct. No flames or switches, ventilate, evacuate and report.'}]},
-  workshop:{who:'🛠️ Workshop', text:'Someone is grinding metal. Sparks are flying and the machine is very loud. You need to pass through to the store.',
-    o:[{t:'Pass quickly without goggles or ear plugs', ok:false, fx:{eyes:-4,hearing:-2}, why:'Grinding sparks and chips damage eyes, and loud noise damages hearing permanently.'},
-       {t:'Put on goggles and ear plugs, wait for a pause, then pass behind the screen', ok:true, why:'Correct. Wear the right PPE for the area.'}]},
-  chemical:{who:'🧪 Chemical store', text:'You find a drink bottle with clear liquid in it and no label on the chemical shelf.',
-    o:[{t:'Smell it to find out what it is', ok:false, fx:{lungs:-3,eyes:-2}, why:'Never smell or taste an unknown chemical.'},
-       {t:'Don\'t touch it. Report it so it can be labelled or disposed of safely', ok:true, why:'Correct. Every chemical needs a label and a safety data sheet (SDS).'}]},
-  diesel:{who:'🚬 Contractor', text:'A contractor near the diesel tanks lights a cigarette: "Diesel no dey catch fire like petrol."',
-    o:[{t:'Stand with him and gist', ok:false, fx:{site:-4}, why:'Diesel vapour, spills and nearby fuels can ignite. No smoking near fuel.'},
-       {t:'Ask him to put it out, show him the No Smoking sign and report it', ok:true, why:'Correct. Speaking up protects everyone on site.'}]},
-  warehouse:{who:'🧔🏾 Oga (Supervisor)', text:'"Abeg climb that rack and bring the top box. No time for ladder, the customer dey wait!"',
-    o:[{t:'Climb the rack', ok:false, fatal:true, why:'You fell from height. Falls from height are among the top killers at work.'},
-       {t:'"I no fit do am like that." Use your Stop-Work right and get a ladder or order picker', ok:true, fx:{site:2}, badge:'Stop-Work Hero', why:'Correct. Everyone has the right to stop unsafe work, even when Oga is the one asking.'}]},
-  generator:{who:'⛽ Generator house', text:'The gen is running, the door is shut and a colleague is sleeping inside on a carton.',
-    o:[{t:'Leave him to rest', ok:false, fx:{lungs:-4,site:-2}, why:'Gen fumes contain carbon monoxide. You cannot smell it, and it kills people who are sleeping. Na quiet killer be gen smoke.'},
-       {t:'Open the door, wake him, bring him to fresh air and report', ok:true, why:'Correct. Ventilate, remove the person and report.'}]},
-  loading:{who:'🚚 Loading bay', text:'A truck is at the bay. The loader is inside the trailer, the driver is in the cab with the engine running, and there are no wheel chocks.',
-    o:[{t:'Start loading, the driver knows we\'re working', ok:false, fx:{health:-4}, why:'If the driver pulls away while someone is inside, that person falls or gets crushed.'},
-       {t:'Engine off, keys to the bay supervisor, chock the wheels, then load', ok:true, why:'Correct. Secure the vehicle before anyone works on it.'}]},
-  carpark:{who:'🚐 Reversing van', text:'BEEP BEEP. A van is reversing towards you. There is no banksman, and your path goes right behind it.',
-    o:[{t:'Run behind it quickly', ok:false, fx:{health:-5}, why:'The driver cannot see behind the van. Reversing vehicles kill people every year.'},
-       {t:'Stop, step aside where the driver can see you, and wait until it has parked', ok:true, why:'Correct. Keep out of a reversing vehicle\'s path.'}]},
-  muster:{who:'🦺 Fire Warden', text:'"This is the Muster Point. If the fire alarm rings, where will you go?"',
-    o:[{t:'To my car, so I can leave quickly', ok:false, fx:{site:-1}, why:'The muster point is where you are counted. If you are missing, rescuers may go in looking for you.'},
-       {t:'Straight here, and I report to the fire warden', ok:true, why:'Correct. Remember this spot. You may need it soon.'}]},
-  electrical_electrician:{who:'👔 Production Manager', text:'"Change that breaker now. The panel is live, but no permit, we can\'t stop production!"',
-    o:[{t:'Work on it live, "e no go take time"', ok:false, fatal:true, why:'You were electrocuted. Never work on live equipment.'},
-       {t:'Get a permit, isolate the supply, lock and tag it (LOTO), test it is dead, then work', ok:true, fx:{site:2}, badge:'LOTO Pro', why:'Correct. Isolate, lock, tag, try. Production can wait; your life cannot.'}]},
-  electrical_default:{who:'⚡ Electrical room', text:'The door marked "DANGER – Authorised Persons Only" is open and the panel is humming. A friend says: "Come see inside."',
-    o:[{t:'Go in and look', ok:false, fx:{health:-3,site:-1}, why:'High voltage can arc. Only authorised people may enter.'},
-       {t:'Stay out, close the door if it is safe to do so, and report it', ok:true, why:'Correct. Respect the signs.'}]},
-};
-const EVENTS = {
-  nepa:{who:'⚡ NEPA has taken light!', text:'Power is gone and the compound goes dark. Someone wants to "back-feed" the office by plugging the small gen straight into a wall socket.',
-    o:[{t:'Help him plug it in', ok:false, fx:{health:-3,site:-2}, why:'Back-feeding can electrocute people working on the lines and can cause a fire.'},
-       {t:'Stop him. Only the changeover switch should be used, by an electrician', ok:true, why:'Correct. Use the proper changeover.'}]},
-  rain:{who:'🌧️ Heavy rain!', text:'The yard is flooding and water is moving towards the electrical room door.',
-    o:[{t:'Wade through to get to the canteen faster', ok:false, fx:{health:-3}, why:'Water and electricity kill. You also cannot see open drains under flood water.'},
-       {t:'Keep away, warn others and call the emergency number', ok:true, why:'Correct. Warn, keep away, report.'}]},
-};
-const HAZARDS = [
-  {e:'🧯', t:'Fire extinguisher hidden behind cartons'}, {e:'🔌', t:'Frayed extension cable across the path'},
-  {e:'🚪', t:'Fire exit blocked with pallets'}, {e:'⚙️', t:'Machine with its guard removed'},
-  {e:'🧴', t:'Unlabelled chemical bottle'}, {e:'🪜', t:'Ladder with a broken rung'},
-  {e:'🛢️', t:'Oil spill on the walkway'}, {e:'🔥', t:'Oily rags piled next to a hot pipe'},
-];
-const DECOYS = [
-  {e:'🩹', t:'Stocked first-aid box'}, {e:'🗑️', t:'Waste bin with lid'}, {e:'🚿', t:'Eye-wash station'},
-  {e:'📞', t:'Emergency phone'}, {e:'🪧', t:'Lit exit sign'}, {e:'🧤', t:'Gloves on a PPE rack'},
-];
+// Scenarios, zones and the compound layout come from a site file (sites/acme-ikeja.json is built in as SITE_DEFAULT).
+// ?site=sites/<file>.json loads another site; ?site=local plays the draft from builder.html.
+// ?course=advanced plays the advanced course; ?mode=oga plays Oga Mode (supervisor).
+const SITE_DEFAULT = {"_about": "Site Life site file. Edit with builder.html. Units: 1 = 5 cm. Load with index.html?site=sites/<file>.json", "name": "Acme Manufacturing, Ikeja", "sign": "ACME MANUFACTURING LTD · IKEJA", "fence": {"l": 40, "t": 40, "r": 1560, "b": 1180, "gateL": 100, "gateR": 220}, "lane": {"x1": 260, "x2": 1540, "y1": 400, "y2": 480}, "cross": [{"x1": 640, "x2": 700}, {"x1": 1180, "x2": 1240}], "noise": {"x": 1030, "y": 180, "r": 210}, "buildings": [{"id": "admin", "name": "ADMIN", "x": 300, "y": 80, "w": 260, "h": 200, "c": "#e6dcc6", "ht": 9, "door": {"x": 430, "y": 296}}, {"id": "canteen", "name": "CANTEEN", "x": 620, "y": 80, "w": 220, "h": 200, "c": "#e8c9a4", "ht": 5, "door": {"x": 730, "y": 296}}, {"id": "workshop", "name": "WORKSHOP", "x": 900, "y": 80, "w": 260, "h": 200, "c": "#b9bdc1", "ht": 7, "door": {"x": 1030, "y": 296}}, {"id": "chemical", "name": "CHEM STORE", "x": 1220, "y": 80, "w": 150, "h": 160, "c": "#d9d3c7", "ht": 4, "door": {"x": 1295, "y": 256}}, {"id": "reception", "name": "RECEPTION", "x": 300, "y": 560, "w": 220, "h": 160, "c": "#d5e2d6", "ht": 5, "door": {"x": 284, "y": 640}}, {"id": "warehouse", "name": "WAREHOUSE", "x": 580, "y": 540, "w": 380, "h": 240, "c": "#c8ccd1", "ht": 9, "door": {"x": 770, "y": 524}}, {"id": "electrical", "name": "ELECTRICAL", "x": 1010, "y": 560, "w": 150, "h": 140, "c": "#eee0b0", "ht": 4, "door": {"x": 1085, "y": 544}}, {"id": "generator", "name": "GEN HOUSE", "x": 1220, "y": 560, "w": 180, "h": 140, "c": "#bcb7ad", "ht": 4.5, "door": {"x": 1310, "y": 544}}, {"id": "booth", "name": "SECURITY", "x": 250, "y": 1080, "w": 80, "h": 70, "c": "#ecebe6", "ht": 3}], "tanks": [{"x": 1440, "y": 130, "r": 42}, {"x": 1500, "y": 240, "r": 42}], "truck": {"x": 640, "y": 840, "w": 240, "h": 86}, "parked": [{"x": 1060, "y": 1090, "w": 60, "h": 36, "c": "#c33"}, {"x": 1160, "y": 1090, "w": 60, "h": 36, "c": "#eee"}, {"x": 1260, "y": 1090, "w": 60, "h": 36, "c": "#335"}], "muster": {"x": 1470, "y": 1000, "r": 56}, "spots": [[590, 180], [870, 200], [1190, 180], [320, 330], [545, 760], [985, 630], [1195, 730], [1420, 620], [565, 890], [995, 880], [275, 990], [1430, 1130]], "zones": [{"id": "gate", "name": "Security at the Main Gate", "x": 160, "y": 1186, "r": 70, "hint": "Talk to Security at the gate"}, {"id": "reception", "name": "Reception & PPE", "x": 284, "y": 640, "r": 60, "hint": "Collect your PPE at Reception"}, {"id": "admin", "name": "Admin Offices", "x": 430, "y": 296, "r": 60, "hint": "Go to the Admin meeting"}, {"id": "canteen", "name": "Canteen", "x": 730, "y": 296, "r": 60, "hint": "Check the Canteen"}, {"id": "workshop", "name": "Workshop", "x": 1030, "y": 296, "r": 60, "hint": "Pass through the Workshop"}, {"id": "chemical", "name": "Chemical Store", "x": 1295, "y": 256, "r": 60, "hint": "Inspect the Chemical Store"}, {"id": "diesel", "name": "Contractor at the Diesel Tanks", "x": 1385, "y": 345, "r": 60, "hint": "Visit the Diesel Tank Farm"}, {"id": "forklift", "name": "Forklift Lane", "x": 670, "y": 440, "r": 0, "hint": "Cross the forklift lane safely"}, {"id": "warehouse", "name": "Oga at the Warehouse", "x": 770, "y": 524, "r": 60, "hint": "See Oga at the Warehouse"}, {"id": "electrical", "name": "Electrical Room", "x": 1085, "y": 544, "r": 60, "hint": "Go to the Electrical Room"}, {"id": "generator", "name": "Generator House", "x": 1310, "y": 544, "r": 60, "hint": "Check the Generator House"}, {"id": "loading", "name": "Loading Bay", "x": 920, "y": 900, "r": 70, "hint": "Help at the Loading Bay"}, {"id": "carpark", "name": "Car Park", "x": 0, "y": 0, "r": 0, "hint": "Walk through the Car Park"}, {"id": "muster", "name": "Muster Point", "x": 1470, "y": 1000, "r": 0, "hint": "Find the Muster Point"}], "npcs": [{"x": 250, "y": 1150, "label": "Security", "look": {"sex": "m", "skin": "#3b2416", "top": "#2b3f66", "bottom": "#1f2a40", "hat": "cap", "hatColor": "#1b2538", "longSleeve": true, "collar": true, "beard": true, "boots": true, "label": "Security"}}, {"x": 250, "y": 640, "label": "Receptionist", "look": {"sex": "f", "skin": "#6b4226", "dress": true, "outfit": "dress", "topMap": null, "gele": null, "hair": "none", "shoe": "#5a1d1d", "label": "Receptionist"}}, {"x": 770, "y": 310, "label": "Cook", "look": {"sex": "m", "skin": "#4a2e1e", "top": "#f6f6f2", "bottom": "#2b2b2b", "hat": "chef", "longSleeve": true, "outfit": "chef", "label": "Cook"}}, {"x": 1375, "y": 365, "label": "Contractor", "smoke": true, "look": {"sex": "m", "skin": "#5a3825", "top": "#d9661f", "bottom": "#d9661f", "outfit": "coverall", "hat": "hard", "hatColor": "#f5f5f5", "longSleeve": true, "beard": true, "boots": true, "gloves": true, "label": "Contractor"}}, {"x": 815, "y": 512, "label": "Oga", "look": {"sex": "m", "skin": "#3d2416", "top": "#9fc3e6", "bottom": "#2a2f3a", "build": "heavy", "vest": true, "hat": "hard", "hatColor": "#ffffff", "longSleeve": true, "collar": true, "beard": true, "boots": true, "label": "Oga (Supervisor)"}}, {"x": 1500, "y": 1040, "label": "Fire Warden", "look": {"sex": "f", "skin": "#5a3825", "top": "#2b2b36", "bottom": "#2b2b36", "hair": "braids", "vest": true, "vestColor": "#ff4d1a", "hat": "hard", "hatColor": "#d0201a", "longSleeve": true, "boots": true, "label": "Fire Warden"}}], "route": ["gate", "reception", "admin", "canteen", "workshop", "chemical", "diesel", "forklift", "electrical", "generator", "warehouse", "loading", "carpark", "muster"], "targets": {"forklift": [670, 500], "carpark": [1290, 960], "muster": [1470, 1000]}, "znames": {"forklift": "Zebra crossing (forklift lane)", "carpark": "Car Park", "muster": "Muster Point"}, "scenarios": {"gate": {"who": "👮 Security", "text": "An okada drops you at the gate. Your hands are full and you have no ID. Security says: \"Go in, I know you.\"", "o": [{"t": "Thank him and walk in", "ok": false, "fx": {"site": -2}, "why": "If you never sign in, nobody will know you are on site, so the muster count misses you in a fire."}, {"t": "Wait, sign the visitor register and collect a pass", "ok": true, "why": "Correct. Security controls who is inside so that everyone can be accounted for in an emergency."}]}, "reception": {"who": "💁🏾‍♀️ Receptionist", "text": "\"Welcome! Here are your safety boots, hi-vis vest, hard hat, goggles and ear plugs.\" The boots are a bit tight.", "o": [{"t": "Leave the PPE, \"na only small time I go spend\"", "ok": false, "fx": {"site": -1}, "ppe": false, "why": "Accident no dey give notice. Without ear plugs and goggles, noisy areas will now damage your hearing."}, {"t": "Ask for the correct size and wear everything", "ok": true, "ppe": true, "why": "Correct. PPE only works if you wear it, and it must fit. Your character is now wearing PPE."}]}, "admin": {"who": "🏢 Admin stairs", "text": "On the staircase, a cleaner has just mopped. There is no wet-floor sign and you are carrying files with both hands.", "o": [{"t": "Rush down, you are late", "ok": false, "fx": {"health": -3}, "why": "Slips, trips and falls are among the most common workplace injuries. Hold the rail."}, {"t": "Hold the handrail, go slowly and tell the cleaner to put up a sign", "ok": true, "why": "Correct. You protected yourself and the next person."}]}, "canteen": {"who": "👨🏾‍🍳 Cook", "text": "You smell gas near the kitchen burners. The cook is about to strike a match: \"Make I light am, food don late.\"", "o": [{"t": "Ignore it, cooks know their work", "ok": false, "fx": {"health": -3, "site": -3}, "why": "A gas leak plus a flame can cause an explosion."}, {"t": "Shout \"STOP, no fire!\", don't touch switches, open the windows, get people out and report it", "ok": true, "why": "Correct. No flames or switches, ventilate, evacuate and report."}]}, "workshop": {"who": "🛠️ Workshop", "text": "Someone is grinding metal. Sparks are flying and the machine is very loud. You need to pass through to the store.", "o": [{"t": "Pass quickly without goggles or ear plugs", "ok": false, "fx": {"eyes": -4, "hearing": -2}, "why": "Grinding sparks and chips damage eyes, and loud noise damages hearing permanently."}, {"t": "Put on goggles and ear plugs, wait for a pause, then pass behind the screen", "ok": true, "why": "Correct. Wear the right PPE for the area."}]}, "chemical": {"who": "🧪 Chemical store", "text": "You find a drink bottle with clear liquid in it and no label on the chemical shelf.", "o": [{"t": "Smell it to find out what it is", "ok": false, "fx": {"lungs": -3, "eyes": -2}, "why": "Never smell or taste an unknown chemical."}, {"t": "Don't touch it. Report it so it can be labelled or disposed of safely", "ok": true, "why": "Correct. Every chemical needs a label and a safety data sheet (SDS)."}]}, "diesel": {"who": "🚬 Contractor", "text": "A contractor near the diesel tanks lights a cigarette: \"Diesel no dey catch fire like petrol.\"", "o": [{"t": "Stand with him and gist", "ok": false, "fx": {"site": -4}, "why": "Diesel vapour, spills and nearby fuels can ignite. No smoking near fuel."}, {"t": "Ask him to put it out, show him the No Smoking sign and report it", "ok": true, "why": "Correct. Speaking up protects everyone on site."}]}, "warehouse": {"who": "🧔🏾 Oga (Supervisor)", "text": "\"Abeg climb that rack and bring the top box. No time for ladder, the customer dey wait!\"", "o": [{"t": "Climb the rack", "ok": false, "fatal": true, "why": "You fell from height. Falls from height are among the top killers at work."}, {"t": "\"I no fit do am like that.\" Use your Stop-Work right and get a ladder or order picker", "ok": true, "fx": {"site": 2}, "badge": "Stop-Work Hero", "why": "Correct. Everyone has the right to stop unsafe work, even when Oga is the one asking."}]}, "generator": {"who": "⛽ Generator house", "text": "The gen is running, the door is shut and a colleague is sleeping inside on a carton.", "o": [{"t": "Leave him to rest", "ok": false, "fx": {"lungs": -4, "site": -2}, "why": "Gen fumes contain carbon monoxide. You cannot smell it, and it kills people who are sleeping. Na quiet killer be gen smoke."}, {"t": "Open the door, wake him, bring him to fresh air and report", "ok": true, "why": "Correct. Ventilate, remove the person and report."}]}, "loading": {"who": "🚚 Loading bay", "text": "A truck is at the bay. The loader is inside the trailer, the driver is in the cab with the engine running, and there are no wheel chocks.", "o": [{"t": "Start loading, the driver knows we're working", "ok": false, "fx": {"health": -4}, "why": "If the driver pulls away while someone is inside, that person falls or gets crushed."}, {"t": "Engine off, keys to the bay supervisor, chock the wheels, then load", "ok": true, "why": "Correct. Secure the vehicle before anyone works on it."}]}, "carpark": {"who": "🚐 Reversing van", "text": "BEEP BEEP. A van is reversing towards you. There is no banksman, and your path goes right behind it.", "o": [{"t": "Run behind it quickly", "ok": false, "fx": {"health": -5}, "why": "The driver cannot see behind the van. Reversing vehicles kill people every year."}, {"t": "Stop, step aside where the driver can see you, and wait until it has parked", "ok": true, "why": "Correct. Keep out of a reversing vehicle's path."}]}, "muster": {"who": "🦺 Fire Warden", "text": "\"This is the Muster Point. If the fire alarm rings, where will you go?\"", "o": [{"t": "To my car, so I can leave quickly", "ok": false, "fx": {"site": -1}, "why": "The muster point is where you are counted. If you are missing, rescuers may go in looking for you."}, {"t": "Straight here, and I report to the fire warden", "ok": true, "why": "Correct. Remember this spot. You may need it soon."}]}, "electrical_electrician": {"who": "👔 Production Manager", "text": "\"Change that breaker now. The panel is live, but no permit, we can't stop production!\"", "o": [{"t": "Work on it live, \"e no go take time\"", "ok": false, "fatal": true, "why": "You were electrocuted. Never work on live equipment."}, {"t": "Get a permit, isolate the supply, lock and tag it (LOTO), test it is dead, then work", "ok": true, "fx": {"site": 2}, "badge": "LOTO Pro", "why": "Correct. Isolate, lock, tag, try. Production can wait; your life cannot."}]}, "electrical_default": {"who": "⚡ Electrical room", "text": "The door marked \"DANGER – Authorised Persons Only\" is open and the panel is humming. A friend says: \"Come see inside.\"", "o": [{"t": "Go in and look", "ok": false, "fx": {"health": -3, "site": -1}, "why": "High voltage can arc. Only authorised people may enter."}, {"t": "Stay out, close the door if it is safe to do so, and report it", "ok": true, "why": "Correct. Respect the signs."}]}}, "events": {"nepa": {"who": "⚡ NEPA has taken light!", "text": "Power is gone and the compound goes dark. Someone wants to \"back-feed\" the office by plugging the small gen straight into a wall socket.", "o": [{"t": "Help him plug it in", "ok": false, "fx": {"health": -3, "site": -2}, "why": "Back-feeding can electrocute people working on the lines and can cause a fire."}, {"t": "Stop him. Only the changeover switch should be used, by an electrician", "ok": true, "why": "Correct. Use the proper changeover."}]}, "rain": {"who": "🌧️ Heavy rain!", "text": "The yard is flooding and water is moving towards the electrical room door.", "o": [{"t": "Wade through to get to the canteen faster", "ok": false, "fx": {"health": -3}, "why": "Water and electricity kill. You also cannot see open drains under flood water."}, {"t": "Keep away, warn others and call the emergency number", "ok": true, "why": "Correct. Warn, keep away, report."}]}}, "hazards": [{"e": "🧯", "t": "Fire extinguisher hidden behind cartons"}, {"e": "🔌", "t": "Frayed extension cable across the path"}, {"e": "🚪", "t": "Fire exit blocked with pallets"}, {"e": "⚙️", "t": "Machine with its guard removed"}, {"e": "🧴", "t": "Unlabelled chemical bottle"}, {"e": "🪜", "t": "Ladder with a broken rung"}, {"e": "🛢️", "t": "Oil spill on the walkway"}, {"e": "🔥", "t": "Oily rags piled next to a hot pipe"}], "decoys": [{"e": "🩹", "t": "Stocked first-aid box"}, {"e": "🗑️", "t": "Waste bin with lid"}, {"e": "🚿", "t": "Eye-wash station"}, {"e": "📞", "t": "Emergency phone"}, {"e": "🪧", "t": "Lit exit sign"}, {"e": "🧤", "t": "Gloves on a PPE rack"}], "courses": {"advanced": {"title": "Advanced Site Course", "about": "Work at height, confined space, hot work, chemical spill, first aid, manual handling and journey management.", "keep": ["gate", "reception", "muster"], "zones": [{"id": "height", "name": "Scaffold at the Generator House", "x": 1490, "y": 720, "r": 60, "hint": "Fix the light on the scaffold", "prop": "scaffold", "px": 1470, "py": 640}, {"id": "confined", "name": "Manhole (confined space)", "x": 430, "y": 905, "r": 60, "hint": "Check the pump in the manhole", "prop": "manhole", "px": 430, "py": 850}, {"id": "hotwork", "name": "Welding near the drums", "x": 590, "y": 345, "r": 55, "hint": "See the welder near the drums", "prop": "welding", "px": 590, "py": 330}, {"id": "spill", "name": "Chemical spill on the walkway", "x": 1120, "y": 350, "r": 55, "hint": "Deal with the chemical spill", "prop": "spill", "px": 1150, "py": 335}, {"id": "firstaid", "name": "Injured worker", "x": 505, "y": 1010, "r": 60, "hint": "Help the injured worker", "prop": "casualty", "px": 550, "py": 1000}, {"id": "manual", "name": "Heavy cartons at the bay", "x": 960, "y": 1000, "r": 60, "hint": "Move the cartons at the Loading Bay", "prop": "boxes", "px": 1000, "py": 1010}, {"id": "journey", "name": "Company pickup trip", "x": 1095, "y": 1050, "r": 55, "hint": "Plan the trip in the company pickup", "prop": "journey", "px": 1040, "py": 1040}], "route": ["gate", "reception", "hotwork", "spill", "height", "manual", "journey", "firstaid", "confined", "muster"], "scenarios": {"height": {"who": "🧗🏾 Scaffold", "text": "You must fix a light 4 metres up. The scaffold tag is RED and a toe board is missing. Your harness is in the store, five minutes away.", "o": [{"t": "Climb up quickly and hold the frame", "ok": false, "fatal": true, "why": "You fell. A red tag means the scaffold is not safe to use. Falls from height kill more workers than almost anything else."}, {"t": "Stand on a plastic chair on the scaffold base instead", "ok": false, "fx": {"health": -3}, "why": "Chairs and drums are not work platforms. They tip over."}, {"t": "Don't use it. Get the scaffold inspected (green tag), wear a harness clipped to an anchor point, then climb with three points of contact", "ok": true, "badge": "Height Safe", "why": "Correct. Only use a scaffold with a green tag, and protect yourself from a fall with a harness on an anchor point."}]}, "confined": {"who": "🕳️ Manhole", "text": "A pump in the manhole has stopped. Your colleague wants to climb down: \"Na just two metres, I go comot sharp sharp.\"", "o": [{"t": "Go down with him so he is not alone", "ok": false, "fatal": true, "why": "Gas in the manhole made you both collapse. Most people who die in confined spaces are the ones who go in to help."}, {"t": "Tie a rope on him and let him go in quickly", "ok": false, "fx": {"lungs": -3, "site": -2}, "why": "A rope does not protect him from toxic gas or lack of oxygen. The air must be tested first."}, {"t": "Stop. Nobody goes in without a permit, a gas test, fresh air blown in, a standby man at the top and a rescue plan", "ok": true, "badge": "Confined Space Aware", "why": "Correct. Test the air, ventilate, keep a standby person outside and have a rescue plan before anyone enters."}]}, "hotwork": {"who": "👨🏾‍🏭 Welder", "text": "A welder is about to weld a bracket. Diesel drums and oily rags are three metres away, and there is no fire extinguisher.", "o": [{"t": "Let him start. Sparks don't go that far", "ok": false, "fx": {"site": -3, "health": -2}, "why": "Welding sparks can fly more than 10 metres and smoulder for an hour before a fire starts."}, {"t": "Stop the job. Hot work needs a permit: move the fuel and rags at least 11 metres away or cover them, have an extinguisher ready, and keep a fire watch during and for 30 minutes after", "ok": true, "why": "Correct. A hot work permit, a clear area, an extinguisher and a fire watch prevent most welding fires."}]}, "spill": {"who": "🛢️ Spill", "text": "A drum has tipped over. A chemical with a sharp smell is spreading across the walkway towards the drain.", "o": [{"t": "Wash it into the drain with plenty of water", "ok": false, "fx": {"site": -3}, "why": "That pollutes the drain and the environment, and some chemicals react with water."}, {"t": "Wipe it up with a rag and your bare hands", "ok": false, "fx": {"health": -2, "eyes": -1}, "why": "Never touch an unknown chemical without the right gloves and eye protection."}, {"t": "Warn people and keep them back, read the label and safety data sheet (SDS), put on the right PPE, use the spill kit to stop it reaching the drain, and report it", "ok": true, "badge": "Spill Responder", "why": "Correct. Protect people first, then contain the spill with the spill kit, then report."}]}, "firstaid": {"who": "🩹 Injured worker", "text": "A worker has fallen off a ladder. He is awake, but his arm is bleeding heavily.", "o": [{"t": "Lift him up and walk him to your car to go to hospital", "ok": false, "fx": {"site": -2}, "why": "Moving him can make hidden injuries worse, and he keeps losing blood on the way."}, {"t": "Put sand or powder on the wound to stop the blood", "ok": false, "fx": {"site": -2}, "why": "That causes infection and does not stop heavy bleeding."}, {"t": "Check it is safe, shout for the first aider and call 112, wear gloves, press hard on the wound with a clean cloth and keep him still", "ok": true, "badge": "First Aider", "why": "Correct. Keep yourself safe, get help, and stop the bleeding with firm pressure."}]}, "manual": {"who": "📦 Loading bay", "text": "Oga says: \"Carry these four cartons to the bay in one trip.\" Together they weigh about 40 kg.", "o": [{"t": "Bend over and lift them all at once", "ok": false, "fx": {"health": -3}, "why": "Lifting a heavy load with a bent back is the main cause of back injuries at work."}, {"t": "Use a trolley or split the load. Bend your knees, keep your back straight and the load close, and don't twist", "ok": true, "why": "Correct. Avoid heavy lifts where you can, and lift with good technique when you must."}]}, "journey": {"who": "🛻 Company pickup", "text": "You must go to Sagamu for a delivery. It is 6 pm, the driver worked a double shift, the seat belt is broken, and he says he will \"just reply WhatsApp\" on the way.", "o": [{"t": "Go. Sagamu no far", "ok": false, "fatal": true, "why": "The tired driver crashed at night on the expressway, and you had no seat belt. Road crashes are a top cause of work deaths in Nigeria."}, {"t": "Stop the trip until the belt is fixed. Follow the journey plan: a rested driver, no phone while driving, travel in daylight, and call to check in when you arrive", "ok": true, "badge": "Journey Manager", "why": "Correct. Journey management means a fit driver, a safe vehicle, a planned route and no phone at the wheel."}]}}}}, "oga": {"title": "Oga Mode", "about": "You are the supervisor. Spot unsafe acts and stop them fast.", "start": [300, 1000], "incidents": [{"id": "nohat", "name": "Worker without a hard hat at the Warehouse", "x": 700, "y": 515, "look": {"hat": null}, "text": "A worker is stacking cartons under the high racks with no hard hat.", "o": [{"t": "Stop the job, get him a hard hat, and only then let him continue", "ok": true}, {"t": "Shout from far away and keep walking", "ok": false}, {"t": "Ignore it. He has been doing this job for years", "ok": false}], "harm": "A carton fell on the worker's head."}, {"id": "smoke", "name": "Smoking near the diesel tanks", "x": 1400, "y": 335, "smoke": true, "text": "A driver is smoking right next to the diesel tanks.", "o": [{"t": "Tell him to put it out now and move to the smoking area, then report it", "ok": true}, {"t": "Wait until he finishes the cigarette", "ok": false}, {"t": "Leave it. Diesel does not burn easily", "ok": false}], "harm": "A fire started at the tank farm."}, {"id": "lane", "name": "Worker on the phone in the forklift lane", "x": 900, "y": 470, "phone": true, "text": "A worker is texting while walking along the forklift lane, away from the zebra crossing.", "o": [{"t": "Stop him, move him onto the walkway, and remind him to cross only at the zebra crossing with the phone away", "ok": true}, {"t": "Hoot at him like a driver", "ok": false}, {"t": "It is fine, the forklift will stop", "ok": false}], "harm": "A forklift hit the worker."}, {"id": "goggles", "name": "Grinding without goggles at the Workshop", "x": 1030, "y": 315, "look": {"goggles": false}, "grind": true, "text": "A fitter is grinding metal with no goggles. Sparks are flying.", "o": [{"t": "Stop the grinding and make him wear goggles and a face shield before he continues", "ok": true}, {"t": "Tell him to close his eyes when sparks come", "ok": false}, {"t": "Ignore it. The job is almost done", "ok": false}], "harm": "A metal chip went into the fitter's eye."}, {"id": "exit", "name": "Fire exit being blocked at Reception", "x": 400, "y": 740, "text": "A worker is stacking pallets in front of the fire exit door at Reception.", "o": [{"t": "Stop him and have the pallets moved to the marked storage area. Fire exits must stay clear", "ok": true}, {"t": "Let it stay until tomorrow", "ok": false}, {"t": "Put a sign on the pallets saying \"Fire exit\"", "ok": false}], "harm": "In a later drill, people were trapped behind the blocked exit."}, {"id": "lift", "name": "Bad lifting at the Loading Bay", "x": 900, "y": 965, "bend": true, "text": "A new worker is lifting a heavy sack with a bent back and twisting as he turns.", "o": [{"t": "Stop him, show him how to lift with bent knees and a straight back, and get a trolley or a second person", "ok": true}, {"t": "Tell him to lift faster so it hurts less", "ok": false}, {"t": "Leave him, he is young and strong", "ok": false}], "harm": "The worker injured his back."}, {"id": "ladder", "name": "Unsafe ladder at the Generator House", "x": 1250, "y": 525, "ladder": true, "text": "A worker is on a ladder at the Generator House. Nobody is holding it, and it is standing on an oil patch.", "o": [{"t": "Get him down, clean the spill, and have someone foot the ladder or tie it before he climbs again", "ok": true}, {"t": "Hold the ladder yourself and keep him working while the oil is there", "ok": false}, {"t": "Ignore it. It is a short ladder", "ok": false}], "harm": "The ladder slipped and the worker fell."}, {"id": "gloves", "name": "Decanting chemicals without gloves", "x": 1250, "y": 268, "look": {"gloves": false, "goggles": false}, "text": "A cleaner is pouring a strong chemical into a drink bottle with bare hands and no goggles.", "o": [{"t": "Stop her. Use the right labelled container, gloves and goggles, and check the safety data sheet", "ok": true}, {"t": "Tell her to be careful and continue", "ok": false}, {"t": "Help her pour it faster", "ok": false}], "harm": "The chemical splashed onto the cleaner's hands and face."}], "interval": 14, "timeout": 40, "pass": 6}};
+function loadSite(){
+  const q=SL.QS.get('site'); let s=null;
+  try{
+    if(q==='local') s=SL.store.get('site-draft',null);
+    else if(q && /^[\w\-./]+\.json$/.test(q) && !q.includes('..')){ const x=new XMLHttpRequest(); x.open('GET',q,false); x.send(); if(x.responseText) s=JSON.parse(x.responseText); }
+  }catch(e){ console.warn('Site file could not be loaded; using the built-in site.',e); }
+  const d=SITE_DEFAULT; if(!s) return d;
+  return {...d, ...s, scenarios:{...d.scenarios,...(s.scenarios||{})}, events:{...d.events,...(s.events||{})}, courses:s.courses||d.courses, oga:s.oga||d.oga, _custom:true};
+}
+const SITE = loadSite();
+const MODE = SL.QS.get('mode')==='oga' && SITE.oga ? 'oga' : 'induction';
+const COURSE_ID = MODE==='induction' && SITE.courses && SITE.courses[SL.QS.get('course')] ? SL.QS.get('course') : 'standard';
+const COURSE = COURSE_ID==='standard' ? null : SITE.courses[COURSE_ID];
+const GAME_ID = MODE==='oga' ? 'oga' : COURSE ? 'factory-'+COURSE_ID : 'factory';
+const SC = {...SITE.scenarios, ...(COURSE?COURSE.scenarios:{})}, EVENTS = SITE.events, HAZARDS = SITE.hazards, DECOYS = SITE.decoys;
 
 // ================== WORLD (map units; 1 unit = 5 cm) ==================
 const W = 1600, H = 1260, K = 0.05;
-const FENCE = {l:40, t:40, r:1560, b:1180, gateL:100, gateR:220};
-const LANE = {x1:260, x2:1540, y1:400, y2:480};
-const CROSS = [{x1:640,x2:700},{x1:1180,x2:1240}];
-const NOISE = {x:1030, y:180, r:210};
-const BUILD = [
-  {id:'admin', name:'ADMIN', x:300,y:80,w:260,h:200, c:'#e6dcc6', ht:9, door:{x:430,y:296}},
-  {id:'canteen', name:'CANTEEN', x:620,y:80,w:220,h:200, c:'#e8c9a4', ht:5, door:{x:730,y:296}},
-  {id:'workshop', name:'WORKSHOP', x:900,y:80,w:260,h:200, c:'#b9bdc1', ht:7, door:{x:1030,y:296}},
-  {id:'chemical', name:'CHEM STORE', x:1220,y:80,w:150,h:160, c:'#d9d3c7', ht:4, door:{x:1295,y:256}},
-  {id:'reception', name:'RECEPTION', x:300,y:560,w:220,h:160, c:'#d5e2d6', ht:5, door:{x:284,y:640}},
-  {id:'warehouse', name:'WAREHOUSE', x:580,y:540,w:380,h:240, c:'#c8ccd1', ht:9, door:{x:770,y:524}},
-  {id:'electrical', name:'ELECTRICAL', x:1010,y:560,w:150,h:140, c:'#eee0b0', ht:4, door:{x:1085,y:544}},
-  {id:'generator', name:'GEN HOUSE', x:1220,y:560,w:180,h:140, c:'#bcb7ad', ht:4.5, door:{x:1310,y:544}},
-  {id:'booth', name:'SECURITY', x:250,y:1080,w:80,h:70, c:'#ecebe6', ht:3},
-];
-const TANKS = [{x:1440,y:130,r:42},{x:1500,y:240,r:42}];
-const TRUCK = {x:640,y:840,w:240,h:86};
-const PARKED = [{x:1060,y:1090,w:60,h:36,c:'#c33'},{x:1160,y:1090,w:60,h:36,c:'#eee'},{x:1260,y:1090,w:60,h:36,c:'#335'}];
-const MUSTER = {x:1470,y:1000,r:56};
-const SPOTS = [[590,180],[870,200],[1190,180],[320,330],[545,760],[985,630],[1195,730],[1420,620],[565,890],[995,880],[275,990],[1430,1130]];
-const ZONES = [
-  {id:'gate', name:'Security at the Main Gate', x:160,y:1186, r:70, hint:'Talk to Security at the gate'},
-  {id:'reception', name:'Reception & PPE', x:284,y:640, r:60, hint:'Collect your PPE at Reception'},
-  {id:'admin', name:'Admin Offices', x:430,y:296, r:60, hint:'Go to the Admin meeting'},
-  {id:'canteen', name:'Canteen', x:730,y:296, r:60, hint:'Check the Canteen'},
-  {id:'workshop', name:'Workshop', x:1030,y:296, r:60, hint:'Pass through the Workshop'},
-  {id:'chemical', name:'Chemical Store', x:1295,y:256, r:60, hint:'Inspect the Chemical Store'},
-  {id:'diesel', name:'Contractor at the Diesel Tanks', x:1385,y:345, r:60, hint:'Visit the Diesel Tank Farm'},
-  {id:'forklift', name:'Forklift Lane', x:670,y:440, r:0, hint:'Cross the forklift lane safely'},
-  {id:'warehouse', name:'Oga at the Warehouse', x:770,y:524, r:60, hint:'See Oga at the Warehouse'},
-  {id:'electrical', name:'Electrical Room', x:1085,y:544, r:60, hint:'Go to the Electrical Room'},
-  {id:'generator', name:'Generator House', x:1310,y:544, r:60, hint:'Check the Generator House'},
-  {id:'loading', name:'Loading Bay', x:920,y:900, r:70, hint:'Help at the Loading Bay'},
-  {id:'carpark', name:'Car Park', x:0,y:0, r:0, hint:'Walk through the Car Park'},
-  {id:'muster', name:'Muster Point', x:MUSTER.x,y:MUSTER.y, r:0, hint:'Find the Muster Point'},
-];
-const NPCS = [
-  {x:250,y:1150, label:'Security', look:{sex:'m',skin:'#3b2416',top:'#2b3f66',bottom:'#1f2a40',hat:'cap',hatColor:'#1b2538',longSleeve:true,collar:true,beard:true,boots:true,label:'Security'}},
-  {x:250,y:640, label:'Receptionist', look:{sex:'f',skin:'#6b4226',dress:true,outfit:'dress',topMap:null,gele:null,hair:'none',shoe:'#5a1d1d',label:'Receptionist'}},
-  {x:770,y:310, label:'Cook', look:{sex:'m',skin:'#4a2e1e',top:'#f6f6f2',bottom:'#2b2b2b',hat:'chef',longSleeve:true,outfit:'chef',label:'Cook'}},
-  {x:1375,y:365, label:'Contractor', smoke:true, look:{sex:'m',skin:'#5a3825',top:'#d9661f',bottom:'#d9661f',outfit:'coverall',hat:'hard',hatColor:'#f5f5f5',longSleeve:true,beard:true,boots:true,gloves:true,label:'Contractor'}},
-  {x:815,y:512, label:'Oga', look:{sex:'m',skin:'#3d2416',top:'#9fc3e6',bottom:'#2a2f3a',build:'heavy',vest:true,hat:'hard',hatColor:'#ffffff',longSleeve:true,collar:true,beard:true,boots:true,label:'Oga (Supervisor)'}},
-  {x:1500,y:1040, label:'Fire Warden', look:{sex:'f',skin:'#5a3825',top:'#2b2b36',bottom:'#2b2b36',hair:'braids',vest:true,vestColor:'#ff4d1a',hat:'hard',hatColor:'#d0201a',longSleeve:true,boots:true,label:'Fire Warden'}},
-];
+const FENCE = SITE.fence, LANE = SITE.lane, CROSS = SITE.cross, NOISE = SITE.noise, BUILD = SITE.buildings;
+const TANKS = SITE.tanks, TRUCK = SITE.truck, PARKED = SITE.parked, MUSTER = SITE.muster, SPOTS = SITE.spots, NPCS = SITE.npcs;
+const ZONES = MODE==='oga' ? [] : COURSE ? [...SITE.zones.filter(z=>COURSE.keep.includes(z.id)), ...COURSE.zones] : SITE.zones;
+const HAS = id => ZONES.some(z=>z.id===id);
+const zpos = id => { const z=SITE.zones.find(z=>z.id===id); return z ? [z.x,z.y] : [-9999,-9999]; };
 
 // ================== STATE ==================
 let S = null, profile = {name:'', company:'', role:null, shirt:SHIRTS[0], skin:SKINS[1], sex:'m'};
@@ -729,19 +652,20 @@ const dist = (a,b,c,d) => Math.hypot(a-c,b-d);
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 
 function newGame(){
-  const spots = shuffle(SPOTS);
-  const hz = shuffle(HAZARDS).slice(0,6), dc = shuffle(DECOYS).slice(0,4);
+  const spots = shuffle(SPOTS), nh = MODE==='oga' ? 0 : 6;
+  const hz = shuffle(HAZARDS).slice(0,nh), dc = shuffle(DECOYS).slice(0,MODE==='oga'?0:4);
   const items = [...hz.map(h=>({...h,hazard:true})), ...dc.map(d=>({...d,hazard:false}))]
     .map((it,i)=>({...it, x:spots[i][0], y:spots[i][1], done:null}));
   S = {
     p:{x:160,y:1242,face:0,step:0,ppe:{},moving:false}, ppeHit:{},
     bars:{health:10,lungs:10,hearing:10,eyes:10,site:10},
-    results:{}, mistakes:[], badges:[], items, hazTotal:6, hazFound:0,
+    results:{}, mistakes:[], badges:[], items, hazTotal:nh, hazFound:0, zoneTimes:{}, lastDone:0, oga:MODE==='oga'?ogaInit():null,
     t:0, forklift:{x:400,dir:1,stop:false}, van:{y:1050,dir:-1,wait:0},
     gateOpen:false, nepa:0, rain:0, firedEvents:{},
     alarm:null, smokeR:0, workers:[], bagDone:false,
     fatal:null, over:false, lastHit:-9, noiseToastAt:-9, smokeToastAt:-9,
   };
+  if(MODE==='oga'){ S.p.x=SITE.oga.start[0]; S.p.y=SITE.oga.start[1]; S.gateOpen=true; S.p.ppe={hat:true,vest:true,boots:true,goggles:true,muffs:true}; }
   yaw = 0; pitch = 0.25;
   if(G) G.resetDynamic();
 }
@@ -792,6 +716,7 @@ function applyChoice(o,label){
 function complete(id, ok){
   if(id in S.results) return;
   S.results[id]=ok;
+  const zz=ZONES.find(z=>z.id===id); S.zoneTimes[zz?zz.name:id]=Math.round(S.t-S.lastDone); S.lastDone=S.t;
   const n = Object.keys(S.results).length;
   if(n===4 && !S.firedEvents.nepa){ S.firedEvents.nepa=1; setTimeout(()=>fireEvent('nepa'),1500); }
   if(n===8 && !S.firedEvents.rain){ S.firedEvents.rain=1; setTimeout(()=>fireEvent('rain'),1500); }
@@ -806,7 +731,7 @@ function fireEvent(k){
 }
 function zoneScenario(id){
   if(id==='electrical') return SC[profile.role.id==='electrician'?'electrical_electrician':'electrical_default'];
-  return SC[id];
+  const z=ZONES.find(z=>z.id===id); return SC[(z&&z.sc)||id];
 }
 
 // ================== INTERACTIONS ==================
@@ -819,6 +744,7 @@ function interactables(){
       scenario(zoneScenario(z.id), z.name, o=>{ complete(z.id,o.ok); if(z.id==='gate'){ S.gateOpen=true; toast('🚧 The barrier is up. Head to Reception for your PPE.'); } });
     }});
   }
+  if(S.oga) for(const a of S.oga.active) list.push({x:a.inc.x,y:a.inc.y,r:70,label:'STOP',name:'Intervene: '+a.inc.name,auto:true,run:()=>ogaIntervene(a)});
   for(const it of S.items){ if(!it.done) list.push({x:it.x,y:it.y,r:48,label:'LOOK',name:'Inspect: '+it.t,run:()=>inspect(it)}); }
   if(S.alarm && !S.bagDone){
     list.push({x:430,y:300,r:55,label:'BAG',name:'Your bag and phone',auto:true,run:()=>{
@@ -860,11 +786,13 @@ function startAlarm(){
 function endGame(){
   if(S.over) return; S.over=true; paused=true;
   $('alarmv').classList.add('hidden'); $('timer').classList.add('hidden');
+  if(S.oga) return endOga();
   const musterOk = S.alarm && S.alarm.done;
   const barsOk = BARS.every(b=>S.bars[b.k]>=5);
   const hazOk = S.hazFound/S.hazTotal>=0.8;
   const pass = !S.fatal && barsOk && hazOk && musterOk;
-  const rec = {date:new Date().toLocaleString(), name:profile.name, company:profile.company, role:profile.role.name, result:pass?'PASS':'REPLAY', hazards:`${S.hazFound}/${S.hazTotal}`, mistakes:S.mistakes.length, where:[...new Set(S.mistakes.map(x=>x.where))].slice(0,15), fatal:!!S.fatal, t:Date.now()};
+  const rec = {date:new Date().toLocaleString(), name:profile.name, company:profile.company, role:profile.role.name, result:pass?'PASS':'REPLAY', hazards:`${S.hazFound}/${S.hazTotal}`, mistakes:S.mistakes.length, where:[...new Set(S.mistakes.map(x=>x.where))].slice(0,15), fatal:!!S.fatal, t:Date.now(),
+    lang:SL.lang, wrong:[...new Set(S.mistakes.map(x=>x.where))].slice(0,40), game:GAME_ID, course:COURSE?COURSE.title:'Standard', score:Math.round(100*Object.values(S.results).filter(v=>v===true).length/ZONES.length), zoneTimes:S.zoneTimes, missed:S.items.filter(i=>i.hazard&&i.done!=='tag').map(i=>i.t)};
   try{const a=JSON.parse(localStorage.getItem('sitelife-log')||'[]'); a.unshift(rec); localStorage.setItem('sitelife-log',JSON.stringify(a.slice(0,50)));}catch(e){}
   pass?chime():buzz();
   const m=openModal(`<h1 style="margin:.1em 0">${S.fatal?'🚑 Shift over':pass?'🎉 Induction passed!':'🔁 Not yet. Replay'}</h1>
@@ -901,6 +829,44 @@ function openPhone(){
   m.querySelector('#cl').onclick=closeModal;
 }
 
+
+// ================== OGA MODE (supervisor) ==================
+// Workers start unsafe acts on a timer (SITE.oga.incidents). Walk there and stop them before the timeout.
+function ogaInit(){ return {queue:shuffle(SITE.oga.incidents.map(x=>x.id)), active:[], log:[], next:4}; }
+function ogaUpdate(dt){
+  const O=SITE.oga, og=S.oga;
+  og.next-=dt;
+  if(og.next<=0 && og.queue.length){ const nid=og.queue.shift(), inc=O.incidents.find(i=>i.id===nid); og.active.push({inc,at:S.t}); og.next=O.interval;
+    toast('⚠️ '+tr('Unsafe act:')+' '+tr(inc.name),'warn'); beep(520,.15,'square',.04); }
+  for(const a of og.active.slice()) if(S.t-a.at>O.timeout){ og.active.splice(og.active.indexOf(a),1); og.log.push({name:a.inc.name,ok:false,missed:true,secs:null});
+    S.mistakes.push({where:a.inc.name, why:a.inc.harm+' You did not get there in time.'}); toast('💥 '+tr(a.inc.harm),'bad'); buzz(); }
+  if(!og.queue.length && !og.active.length) endGame();
+}
+function ogaIntervene(a){
+  const og=S.oga, inc=a.inc, secs=Math.round(S.t-a.at);
+  og.active.splice(og.active.indexOf(a),1);
+  const sc={who:'🧔🏾 Oga Mode', text:inc.text, o:inc.o.map(o=>({...o, why:o.ok?`Correct. Stop the unsafe act, fix it, and explain why. You reacted in ${secs} seconds.`:inc.harm+' A supervisor must stop the job and fix the cause.'}))};
+  scenario(sc, inc.name, o=>{ og.log.push({name:inc.name, ok:o.ok, secs}); });
+}
+function endOga(){
+  const O=SITE.oga, og=S.oga, total=O.incidents.length, good=og.log.filter(l=>l.ok), missedN=og.log.filter(l=>l.missed).length;
+  const avg = good.length ? Math.round(good.reduce((a,l)=>a+l.secs,0)/good.length) : 0;
+  const score = Math.round(og.log.reduce((a,l)=>a+(l.ok?Math.max(30,100-l.secs*2):0),0)/total);
+  const pass = !S.fatal && good.length>=O.pass;
+  const rec = {date:new Date().toLocaleString(), name:profile.name, company:profile.company, role:profile.role.name, result:pass?'PASS':'REPLAY', hazards:`${good.length}/${total}`, mistakes:S.mistakes.length, where:[...new Set(S.mistakes.map(x=>x.where))].slice(0,15), fatal:!!S.fatal, t:Date.now(),
+    lang:SL.lang, wrong:[...new Set(S.mistakes.map(x=>x.where))].slice(0,40), game:GAME_ID, course:'Oga Mode', score, zoneTimes:Object.fromEntries(og.log.filter(l=>l.secs!=null).map(l=>[l.name,l.secs])), missed:og.log.filter(l=>!l.ok).map(l=>l.name)};
+  pass?chime():buzz();
+  const m=openModal(`<h1 style="margin:.1em 0">${pass?'🎉 Good Oga!':'🔁 Not yet. Replay'}</h1>
+    ${S.fatal?`<div class="fb bad">${esc(S.fatal)}</div>`:''}
+    <div class="row"><span class="pill">${pass?'✅':'❌'} Unsafe acts stopped ${good.length}/${total} (need ${O.pass})</span><span class="pill">⏱️ Average reaction ${avg} s</span><span class="pill">🎯 Score ${score}/100</span>${missedN?`<span class="pill">💥 Missed ${missedN}</span>`:''}</div>
+    <ul class="tasks">${og.log.map(l=>`<li><span>${l.ok?'✅':l.missed?'💥':'❌'}</span><span style="flex:1">${esc(l.name)}</span><span class="muted">${l.secs!=null?l.secs+' s':''}</span></li>`).join('')}</ul>
+    <h2 style="margin-top:12px">What to learn</h2>
+    ${S.mistakes.length?`<ul>${S.mistakes.map(x=>`<li><b>${esc(x.where)}:</b> ${esc(x.why)}</li>`).join('')}</ul>`:'<p>No mistakes. Excellent!</p>'}
+    <p id="hseSend" class="muted">⏳ Sending your result to HSE…</p>
+    ${shareBlock(rec,pass)}<div class="row" id="endRow" style="margin-top:12px"><button class="primary" id="again">Play again</button></div>`);
+  sendResult(rec); showDashButton(m.querySelector('#endRow'));
+  m.querySelector('#again').onclick=()=>{closeModal(); showStart();};
+}
 
 // ================== PPE SELECTION ==================
 const PPE_ITEMS=[
@@ -942,11 +908,11 @@ function ppeSelect(onDone){
 
 // ================== GUIDE / ESCORT ==================
 let guideOn = true, guidePick = null;
-const ROUTE = ['gate','reception','admin','canteen','workshop','chemical','diesel','forklift','electrical','generator','warehouse','loading','carpark','muster'];
-const TARGET_PT = {forklift:[670,500], carpark:[1290,960], muster:[MUSTER.x,MUSTER.y]};
-const ZNAME = {forklift:'Zebra crossing (forklift lane)', carpark:'Car Park', muster:'Muster Point'};
+const ROUTE = (COURSE ? COURSE.route : SITE.route || ZONES.map(z=>z.id)).filter(HAS);
+const TARGET_PT = SITE.targets || {}, ZNAME = SITE.znames || {};
 function nextTask(){
   if(S.alarm && !S.alarm.done) return {id:'muster', name:'MUSTER POINT', x:MUSTER.x, y:MUSTER.y};
+  if(S.oga){ const a=S.oga.active.slice().sort((a,b)=>dist(S.p.x,S.p.y,a.inc.x,a.inc.y)-dist(S.p.x,S.p.y,b.inc.x,b.inc.y))[0]; return a ? {id:'oga-'+a.inc.id, name:a.inc.name, x:a.inc.x, y:a.inc.y} : null; }
   const pick = guidePick && !(guidePick in S.results) ? guidePick : ROUTE.find(id=>!(id in S.results));
   if(!pick) return null;
   const z=ZONES.find(z=>z.id===pick), pt=TARGET_PT[pick]||[z.x,z.y];
@@ -1014,7 +980,7 @@ function shareBlock(rec,pass){
 // ================== HSE RESULTS (shared store) ==================
 const cap = (name)=> (window.claude && window.claude.use) ? window.claude.use(name).catch(()=>null) : Promise.resolve(null);
 async function postServer(rec){ // our own server and/or Google Sheets (see SL.post); queued when offline
-  const r=await SL.post({game:'factory',...rec});
+  const r=await SL.post({game:GAME_ID,...rec});
   return r==='sent'?true:r==='queued'?'queued':false;
 }
 async function sendResult(rec){
@@ -1080,6 +1046,7 @@ function solids(){
     s.push({x:FENCE.gateR,y:FENCE.b,w:FENCE.r-FENCE.gateR+10,h:10});
     s.push({x:1400,y:80,w:140,h:220});
     s.push(TRUCK); PARKED.forEach(c=>s.push(c));
+    if(COURSE) COURSE.zones.forEach(z=>{ const sz={scaffold:[44,32],boxes:[30,14]}[z.prop]; if(sz) s.push({x:z.px-sz[0]/2,y:z.py-sz[1]/2,w:sz[0],h:sz[1]}); });
     s.push({x:0,y:H-2,w:W,h:2}); s.push({x:0,y:0,w:4,h:H}); s.push({x:W-4,y:0,w:4,h:H});
     SOLIDS_BASE = s;
   }
@@ -1116,11 +1083,11 @@ function update(dt){
   const ahead = (p.x-f.x)*f.dir;
   f.stop = inLane && ahead>0 && ahead<170;
   if(!f.stop){ f.x+=f.dir*110*dt; if(f.x>LANE.x2-60) f.dir=-1; if(f.x<LANE.x1+60) f.dir=1; }
-  if(inLane && !onCross && !('forklift' in S.results)){
+  if(HAS('forklift') && inLane && !onCross && !('forklift' in S.results)){
     complete('forklift',false); S.mistakes.push({where:'Forklift Lane',why:'You cut across the forklift lane. Only cross at the zebra crossing, where drivers expect people.'});
     S.bars.site=clamp(S.bars.site-1,0,10); toast('⚠️ You are in the forklift lane! Only cross at the zebra crossing.','bad'); buzz();
   }
-  if(inLane && onCross && !('forklift' in S.results)){ complete('forklift',true); toast('✅ Nice. You used the zebra crossing and the forklift stopped for you.'); chime(); }
+  if(HAS('forklift') && inLane && onCross && !('forklift' in S.results)){ complete('forklift',true); toast('✅ Nice. You used the zebra crossing and the forklift stopped for you.'); chime(); }
   if(inLane && Math.abs(p.x-f.x)<44 && Math.abs(p.y-440)<44 && !onCross && S.t-S.lastHit>2){
     S.lastHit=S.t; S.bars.health=clamp(S.bars.health-4,0,10); toast('💥 The forklift hit you! Health −4. The driver could not see you.','bad'); buzz(); G.shake=0.6;
     S.mistakes.push({where:'Forklift Lane',why:'You were hit by a forklift. Stay on walkways and only cross at the zebra crossing.'});
@@ -1131,17 +1098,18 @@ function update(dt){
   if(v.wait>0) v.wait-=dt; else { v.y += v.dir*45*dt; if(v.y<900){v.dir=1;v.wait=2;} if(v.y>1050){v.dir=-1;v.wait=2;} }
   const reversing = v.dir<0 && v.wait<=0;
   if(reversing && Math.floor(S.t*2)%2===0 && Math.floor((S.t-dt)*2)%2!==0 && dist(p.x,p.y,1360,v.y)<380) beep(1150,.08,'square',.03);
-  if(!('carpark' in S.results) && dist(p.x,p.y,1360,v.y-40)<130) scenario(SC.carpark,'Car Park',o=>complete('carpark',o.ok));
+  if(HAS('carpark') && !('carpark' in S.results) && dist(p.x,p.y,1360,v.y-40)<130) scenario(SC.carpark,'Car Park',o=>complete('carpark',o.ok));
   const inMuster = dist(p.x,p.y,MUSTER.x,MUSTER.y)<MUSTER.r;
-  if(!('muster' in S.results) && inMuster && !S.alarm && !paused) scenario(SC.muster,'Muster Point',o=>complete('muster',o.ok));
+  if(HAS('muster') && !('muster' in S.results) && inMuster && !S.alarm && !paused) scenario(SC.muster,'Muster Point',o=>complete('muster',o.ok));
   // noise area
   // consequences of missing PPE (once each)
   const pp=p.ppe, hit=(k,cond,fx,msg)=>{ if(cond && !S.ppeHit[k] && ('reception' in S.results)){ S.ppeHit[k]=1; for(const b in fx) S.bars[b]=clamp(S.bars[b]+fx[b],0,10); S.mistakes.push({where:'Missing PPE',why:msg}); toast('💥 '+msg,'bad'); buzz(); G.shake=.4; } };
-  hit('eyes', !pp.goggles && dist(p.x,p.y,1030,300)<140, {eyes:-3}, 'A grinding spark flew into your eye at the Workshop. You had no safety goggles.');
-  hit('head', !pp.hat && dist(p.x,p.y,770,524)<120, {health:-3}, 'A carton fell from the top rack onto your head at the Warehouse. You had no hard hat.');
-  hit('feet', !pp.boots && dist(p.x,p.y,920,900)<150, {health:-2}, 'A pallet jack rolled over your foot at the Loading Bay. You had no safety boots.');
+  const zd=(id)=>{ const [zx,zy]=zpos(id); return dist(p.x,p.y,zx,zy); };
+  hit('eyes', !pp.goggles && zd('workshop')<140, {eyes:-3}, 'A grinding spark flew into your eye at the Workshop. You had no safety goggles.');
+  hit('head', !pp.hat && zd('warehouse')<120, {health:-3}, 'A carton fell from the top rack onto your head at the Warehouse. You had no hard hat.');
+  hit('feet', !pp.boots && zd('loading')<150, {health:-2}, 'A pallet jack rolled over your foot at the Loading Bay. You had no safety boots.');
   hit('vest', !pp.vest && Math.abs(p.x-S.forklift.x)<180 && p.y>340 && p.y<540, {health:-1,site:-1}, 'The forklift driver nearly hit you. Without a hi-vis vest he could not see you.');
-  hit('hands', !pp.gloves && needsGloves() && (dist(p.x,p.y,770,524)<120 || dist(p.x,p.y,1085,544)<120), {health:-1}, 'You cut your hand on a sharp edge. Your job needs work gloves.');
+  hit('hands', !pp.gloves && needsGloves() && (zd('warehouse')<120 || zd('electrical')<120), {health:-1}, 'You cut your hand on a sharp edge. Your job needs work gloves.');
   if(dist(p.x,p.y,NOISE.x,NOISE.y)<NOISE.r && !S.alarm && !p.ppe.muffs){
     S.bars.hearing=clamp(S.bars.hearing-0.6*dt,0,10);
     if(S.t-S.noiseToastAt>6){S.noiseToastAt=S.t; toast('🔊 Too loud! No ear plugs. Your hearing is being damaged.','warn'); beep(3000,.25,'sine',.015);}
@@ -1158,6 +1126,7 @@ function update(dt){
     if(inMuster){ S.alarm.done=true; toast('✅ You made it to the Muster Point! The fire warden has counted you.'); endGame(); return; }
     if(S.alarm.left<=0){ S.mistakes.push({where:'Fire alarm',why:'You did not reach the muster point in time. Know your route before you need it.'}); endGame(); return; }
   }
+  if(S.oga){ ogaUpdate(dt); if(S.over) return; }
   if(S.bars.health<=0 && !S.fatal){ S.fatal='Your health reached zero.'; endGame(); return; }
   if(S.bars.lungs<=0 && !S.fatal){ S.fatal='You collapsed from breathing smoke or fumes.'; endGame(); return; }
   guideUpdate(dt);
@@ -1594,7 +1563,7 @@ function initThree(){
   renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=.8;
   renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   buildTextures(); BLOB=blobTex();
-  const rec=NPCS.find(n=>n.label==='Receptionist').look; rec.topMap=ankara('#7b1fa2','#f39c12','#1abc9c'); rec.gele=ankara('#f39c12','#7b1fa2','#ffffff');
+  const rec=(NPCS.find(n=>n.label==='Receptionist')||{look:{}}).look; rec.topMap=ankara('#7b1fa2','#f39c12','#1abc9c'); rec.gele=ankara('#f39c12','#7b1fa2','#ffffff');
   const scene=new THREE.Scene();
   const camera=new THREE.PerspectiveCamera(58,1,0.08,700); camera.rotation.order='YXZ';
   // sky + environment lighting
@@ -1727,7 +1696,7 @@ function initThree(){
   const bt=tex(mkCanvas(128,16,(c)=>{ for(let i=0;i<8;i++){ c.fillStyle=i%2?'#d22':'#fff'; c.fillRect(i*16,0,16,16);} }),1,1);
   const pole=bx(X(FENCE.gateR-FENCE.gateL)-.6,.12,.12,std('#fff',{map:bt,r:.4}),(X(FENCE.gateR-FENCE.gateL)-.6)/2,0,0); barrier.add(pole); scene.add(barrier);
   scene.add(bx(.35,1.1,.35,std('#d9a400',{r:.5}),X(FENCE.gateL)+.1,.55,Z(FENCE.b)-.35));
-  const plq=boardCanvas('ACME MANUFACTURING LTD · IKEJA','#0f5132'); const pm=new THREE.Mesh(new THREE.PlaneGeometry(plq.width/110*.5,.5),std('#fff',{map:tex(plq),r:.5})); pm.position.set(X(FENCE.gateR)+5,2.0,Z(FENCE.b)+.14); scene.add(pm);
+  const plq=boardCanvas(SITE.sign||SITE.name||'SITE','#0f5132'); const pm=new THREE.Mesh(new THREE.PlaneGeometry(plq.width/110*.5,.5),std('#fff',{map:tex(plq),r:.5})); pm.position.set(X(FENCE.gateR)+5,2.0,Z(FENCE.b)+.14); scene.add(pm);
   // safety signs
   const wallSign=(kind,t1,t2,x,y,yy,ry)=>{ const p=new THREE.Mesh(new THREE.PlaneGeometry(.6,.75),std('#fff',{map:tex(signCanvas(kind,t1,t2)),r:.5,side:THREE.DoubleSide})); p.position.set(X(x),yy,Z(y)); p.rotation.y=ry; scene.add(p); return p; };
   const postSign=(kind,t1,t2,x,y,ry=0)=>{ scene.add(cyl(.04,.04,2.2,std('#888',{m:.8,r:.4}),X(x),1.1,Z(y),8)); wallSign(kind,t1,t2,x,y,2.0,ry).position.y=2.0; };
@@ -1779,6 +1748,8 @@ function initThree(){
   const beepS=labelSprite('◀ BEEP · REVERSING',.32); beepS.material.color=new THREE.Color('#ff8080'); beepS.position.y=2.9; van.add(beepS);
   // NPCs
   const npcs=NPCS.map(n=>{ const g=makeHuman(n.look); g.position.set(X(n.x),0,Z(n.y)); scene.add(g); if(n.smoke){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:SMOKE_TEX(),transparent:true,opacity:.5,depthWrite:false})); s.scale.set(.4,.4,1); s.position.set(.25,1.75,-.25); g.add(s); g.userData.smoke=s; } return {g,n}; });
+  if(COURSE) buildCourseProps(scene);
+  const oga = MODE==='oga' ? buildOgaWorkers(scene) : [];
   // player
   let player=makeHuman(playerLook()); scene.add(player);
   // rain (streaks)
@@ -1803,7 +1774,7 @@ function initThree(){
   const escort=makeHuman({sex:'m',skin:'#3b2416',top:'#1f3a5f',bottom:'#1f2a3a',outfit:'coverall',longSleeve:true,vest:true,vestColor:'#ff7a00',hat:'hard',hatColor:'#1f6fd1',boots:true,goggles:false,beard:true,label:'HSE Escort · follow me'}); escort.visible=false; scene.add(escort);
   flushInst(scene);
   const dyn={markers:[],items:[],workers:[],bag:null};
-  G={arrows,beam,escort,renderer,scene,camera,hemi,sun,alarmLight,fireLight,barrier,fork,van,beepS,npcs,player,rain,puddles,smoke,flames,beacons,glass,yardMat,streetMat,shake:0,dyn,SKIES,setSky,skyMode:'day',envRT:initEnv,
+  G={oga,arrows,beam,escort,renderer,scene,camera,hemi,sun,alarmLight,fireLight,barrier,fork,van,beepS,npcs,player,rain,puddles,smoke,flames,beacons,glass,yardMat,streetMat,shake:0,dyn,SKIES,setSky,skyMode:'day',envRT:initEnv,
     resetDynamic(){
       dyn.markers.forEach(m=>{scene.remove(m.s); scene.remove(m.ring);}); dyn.items.forEach(i=>scene.remove(i.g)); dyn.workers.forEach(w=>scene.remove(w)); if(dyn.bag) scene.remove(dyn.bag);
       dyn.markers=[]; dyn.items=[]; dyn.workers=[]; dyn.bag=null;
@@ -1822,6 +1793,51 @@ function initThree(){
   };
   addEventListener('resize',resize3D); resize3D(); applyQuality(); applyMarkerColor();
   SL.fps.cb=()=>{ applyQuality(); toast(tr('Graphics set to Low to keep the game smooth on this device. Change it in ⚙️ Settings.')); };
+}
+// Props for course zones that have a "prop" (sites/*.json courses), placed at px,py.
+function buildCourseProps(scene){
+  const steel=std('#9da3a8',{r:.35,m:.85}), wood=std('#9b7448',{r:.95}), carton=std('#b8895a',{r:.95}), black=std('#1b1b1b',{r:.6});
+  for(const z of COURSE.zones){ const g=new THREE.Group(), x0=X(z.px??z.x), z0=Z(z.py??z.y);
+    switch(z.prop){
+      case 'scaffold': { const tube=std('#c9ccce',{r:.3,m:.9}); for(const [a,b] of [[-1,-1],[1,-1],[-1,1],[1,1]]) g.add(bx(.06,4.6,.06,tube,a*1,2.3,b*.7));
+        for(const y of [1.5,3,4.4]){ g.add(bx(2.06,.05,.05,tube,0,y,-.7), bx(2.06,.05,.05,tube,0,y,.7), bx(.05,.05,1.46,tube,-1,y,0), bx(.05,.05,1.46,tube,1,y,0)); }
+        g.add(bx(2,.06,1.4,wood,0,3,0)); const tag=new THREE.Mesh(new THREE.PlaneGeometry(.22,.3),std('#d0201a',{emissive:'#ff2010',emissiveIntensity:.4})); tag.position.set(-1,1.4,-.75); g.add(tag);
+        const lamp=bx(.5,.12,.2,std('#eee',{r:.4}),0,4.45,-.8); g.add(lamp); break; }
+      case 'manhole': { g.add(cyl(.62,.62,.05,std('#3a3a3a',{r:.7,m:.5}),0,.025,0,24)); const cover=cyl(.6,.6,.04,std('#555',{r:.6,m:.7}),.9,.03,.3,24); g.add(cover);
+        g.add(cyl(.55,.55,.02,black,0,.055,0,24)); const leg=std('#e0a800',{r:.5,m:.3}); for(let i=0;i<3;i++){ const a=i*2.1; const l=bx(.05,2.2,.05,leg,Math.cos(a)*.55,1.05,Math.sin(a)*.55); l.rotation.set(Math.sin(a)*.25,0,-Math.cos(a)*.25); g.add(l); }
+        g.add(bx(.25,.25,.25,std('#e0a800'),0,2.1,0)); for(const [a,b] of [[-.9,-.9],[.9,-.9],[-.9,.9],[.9,.9]]) g.add(cyl(.02,.17,.6,std('#ff6a00',{r:.5}),a,.3,b,12)); break; }
+      case 'welding': { g.add(bx(.5,.45,.35,std('#1f5fae',{r:.5,m:.3}),-.6,.23,0)); g.add(bx(1.4,.06,.06,steel,.4,1,0)); g.add(bx(.06,1,.06,steel,1.1,.5,0));
+        for(let i=0;i<3;i++) g.add(cyl(.29,.29,.88,std('#2b2b2b',{r:.45,m:.3}),-.2+i*.65,.44,1.3,18));
+        const rag=std('#5b4a33',{r:1}); for(let i=0;i<5;i++) g.add(mesh(new THREE.IcosahedronGeometry(rnd(.1,.16),0),rag,.6+rnd(-.3,.3),.1,1.1+rnd(-.2,.2)));
+        const w=makeHuman({sex:'m',skin:'#3b2416',top:'#1f3a5f',bottom:'#1f3a5f',outfit:'coverall',longSleeve:true,boots:true,gloves:true,hat:null}); w.position.set(.5,0,-.6); w.rotation.y=Math.PI; g.add(w);
+        g.add(bx(.3,.36,.06,std('#222',{r:.4}),.5,1.62,-.78)); break; }
+      case 'spill': { const sp=new THREE.Mesh(new THREE.CircleGeometry(1,32),std('#7a8a2a',{r:.05,m:.1,transparent:true,opacity:.85})); sp.rotation.x=-Math.PI/2; sp.scale.set(1.6,1,1); sp.position.set(-.6,.02,.3); g.add(sp);
+        const dr=cyl(.29,.29,.88,std('#e6e6e6',{r:.45,m:.3}),.9,.29,0,20); dr.rotation.z=Math.PI/2; g.add(dr);
+        const kit=bx(.6,.7,.5,std('#f1c40f',{r:.5}),1.6,.35,-1.2); g.add(kit); const lab=new THREE.Mesh(new THREE.PlaneGeometry(.5,.18),std('#fff',{map:tex(boardCanvas('SPILL KIT','#c8102e'))})); lab.position.set(1.6,.55,-.94); g.add(lab); break; }
+      case 'casualty': { const c=makeHuman({sex:'m',skin:'#5a3825',top:'#d9661f',bottom:'#d9661f',outfit:'coverall',longSleeve:true,boots:true,hat:null}); c.rotation.x=-Math.PI/2; c.position.set(0,.18,0); g.add(c);
+        const blood=new THREE.Mesh(new THREE.CircleGeometry(.3,20),std('#6a0a0a',{r:.1,transparent:true,opacity:.9})); blood.rotation.x=-Math.PI/2; blood.position.set(.35,.015,-.2); g.add(blood);
+        const lad=new THREE.Group(); const al=std('#bfc4c8',{r:.35,m:.85}); lad.add(bx(.05,2.6,.05,al,-.22,1.3,0), bx(.05,2.6,.05,al,.22,1.3,0)); for(let i=0;i<8;i++) lad.add(bx(.44,.04,.04,al,0,.3+i*.3,0)); lad.rotation.z=Math.PI/2; lad.position.set(1.4,.05,.8); g.add(lad);
+        const hh=mesh(new THREE.SphereGeometry(.15,14,8,0,Math.PI*2,0,Math.PI/2),std('#f1c40f',{r:.35}),-1,0,.4); g.add(hh); break; }
+      case 'boxes': { for(let i=0;i<4;i++) g.add(bx(.55,.4,.45,carton,(i%2)*.6,.2+(i>>1)*.42,0)); g.add(bx(.7,.08,.9,std('#2b5fa8',{r:.5,m:.4}),-1.1,.25,0)); g.add(bx(.04,.9,.04,steel,-1.4,.7,-.4), bx(.04,.9,.04,steel,-1.4,.7,.4)); break; }
+      case 'journey': { const b=boardCanvas('JOURNEY PLAN · SAGAMU','#12355b'); const pl=new THREE.Mesh(new THREE.PlaneGeometry(b.width/110*.45,.45),std('#fff',{map:tex(b),r:.5,side:THREE.DoubleSide})); pl.position.set(0,1.6,0); g.add(pl); g.add(bx(.06,1.4,.06,steel,0,.7,0)); break; }
+    }
+    g.position.set(x0,0,z0); g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } }); scene.add(g);
+  }
+}
+// Oga Mode workers: hidden until their unsafe act starts.
+function buildOgaWorkers(scene){
+  return SITE.oga.incidents.map((inc,i)=>{
+    const f=i%3===2, look={sex:f?'f':'m', skin:SKINS[i%4], top:['#24508a','#2f6f4f','#3a3a3a'][i%3], bottom:'#24508a', outfit:'coverall', vest:true, hat:'hard', hatColor:['#f6f6f2','#f1c40f','#1f6fd1'][i%3], longSleeve:true, boots:true, goggles:true, gloves:true, hair:f?'bun':'low', ...(inc.look||{})};
+    const g=makeHuman(look); g.position.set(X(inc.x),0,Z(inc.y)); g.rotation.y=rnd(0,Math.PI*2); g.visible=false; scene.add(g);
+    if(inc.smoke){ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:SMOKE_TEX(),transparent:true,opacity:.5,depthWrite:false})); sp.scale.set(.4,.4,1); sp.position.set(.25,1.75,-.25); g.add(sp); g.userData.smoke=sp; }
+    if(inc.phone) g.add(bx(.08,.15,.02,std('#111',{r:.3}),.1,1.25,-.25));
+    if(inc.ladder){ const lad=new THREE.Group(); const al=std('#bfc4c8',{r:.35,m:.85}); lad.add(bx(.05,3,.05,al,-.22,1.5,0), bx(.05,3,.05,al,.22,1.5,0)); for(let k=0;k<9;k++) lad.add(bx(.44,.04,.04,al,0,.3+k*.32,0)); lad.rotation.x=.25; lad.position.set(0,0,.4); g.add(lad);
+      const oil=new THREE.Mesh(new THREE.CircleGeometry(.6,24),std('#0c0b0a',{r:.05,transparent:true,opacity:.9})); oil.rotation.x=-Math.PI/2; oil.position.set(0,.015,.3); g.add(oil); }
+    if(inc.grind) g.add(bx(1,.8,.6,std('#3d6b4f',{r:.5,m:.4}),0,.4,-.7));
+    if(inc.bend) g.add(bx(.6,.35,.4,std('#d8cfb5',{r:.95}),0,.2,-.5));
+    const warn=labelSprite('⚠ STOP',.4); warn.material.color=new THREE.Color('#ff5050'); warn.position.y=2.5; g.add(warn);
+    return {inc,g,warn};
+  });
 }
 let BLOB=null, _smokeTex=null;
 function SMOKE_TEX(){ if(!_smokeTex) _smokeTex=tex(mkCanvas(128,128,(c)=>{ for(let i=0;i<6;i++){ const x=rnd(40,88),y=rnd(40,88),r=rnd(25,45); const g=c.createRadialGradient(x,y,2,x,y,r); g.addColorStop(0,'rgba(255,255,255,.55)'); g.addColorStop(1,'rgba(255,255,255,0)'); c.fillStyle=g; c.fillRect(0,0,128,128);} }),1,1); return _smokeTex; }
@@ -1901,6 +1917,8 @@ function render3D(dt){
     else { const r=u.r*S.smokeR; s.position.set(X(1030+Math.cos(u.a)*r), 1+u.h*3+Math.sin(t+u.a)*.3, Z(300+Math.abs(Math.sin(u.a))*r)); const sz=3+S.smokeR*K*.25; s.scale.set(sz,sz,1); } } });
   G.dyn.workers.forEach((g,i)=>{ const w=S.workers[i]; if(!w) return; g.position.set(X(w.x),0,Z(w.y)); if(w.face!==undefined) g.rotation.y=w.face; animHuman(g,w.step,dist(w.x,w.y,MUSTER.x,MUSTER.y)>30,t); });
   if(G.dyn.bag) G.dyn.bag.visible = al && !S.bagDone;
+  G.oga.forEach(({inc,g,warn},i)=>{ const on=!!(S.oga && S.oga.active.some(a=>a.inc.id===inc.id)); g.visible=on; if(!on) return; warn.visible=Math.sin(t*6)>-.3; animHuman(g,0,false,t+i);
+    if(g.userData.smoke){ const k=(t*.5)%1; g.userData.smoke.position.y=1.75+k*.7; g.userData.smoke.material.opacity=.5*(1-k); } });
   // guide visuals
   const gd=S.guide, gOn=guideOn && gd && gd.path && gd.target && !S.over;
   if(gOn){ const pth=gd.path; let n=0, acc=0, nextAt=40; const m4=new THREE.Matrix4(), q=new THREE.Quaternion(), sc=new THREE.Vector3(), ps=new THREE.Vector3(), up=new THREE.Vector3(0,1,0);
@@ -1923,13 +1941,14 @@ function renderIntro(t){
 function drawHUD(){
   $('bars').innerHTML = BARS.map(b=>{const v=S.bars[b.k]; return `<div class="b ${v<5?'low':''}" title="${b.l}">${b.n} ${Math.ceil(v)}<div class="t"><div class="f" style="width:${v*10}%"></div></div></div>`}).join('');
   const mins = 8*60 + Math.floor(S.t); const hh=String(Math.floor(mins/60)%24).padStart(2,'0'), mm=String(mins%60).padStart(2,'0');
-  $('info').innerHTML = `<span>🕗 ${hh}:${mm}</span><span>✅ ${Object.keys(S.results).length}/${ZONES.length}</span><span>🔎 ${S.hazFound}/${S.hazTotal}</span>${PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join('')?'<span>PPE: '+PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join(' ')+'</span>':''}`;
+  $('info').innerHTML = `<span>🕗 ${hh}:${mm}</span>${S.oga?`<span>🧔🏾 ${S.oga.log.filter(l=>l.ok).length}/${SITE.oga.incidents.length}</span><span>⚠️ ${S.oga.active.length}</span>`:`<span>✅ ${Object.keys(S.results).length}/${ZONES.length}</span><span>🔎 ${S.hazFound}/${S.hazTotal}</span>`}${PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join('')?'<span>PPE: '+PPE_ITEMS.filter(i=>!i.bad&&S.p.ppe[i.k]).map(i=>i.e).join(' ')+'</span>':''}`;
   const m=$('mini'), c=m.getContext('2d'), sx=m.width/W, sy=m.height/H;
   c.fillStyle='#cfcabd'; c.fillRect(0,0,m.width,m.height);
   c.fillStyle='#5d5e61'; c.fillRect(LANE.x1*sx,LANE.y1*sy,(LANE.x2-LANE.x1)*sx,(LANE.y2-LANE.y1)*sy); c.fillRect(80*sx,60*sy,160*sx,(FENCE.b-60)*sy);
   BUILD.forEach(b=>{c.fillStyle=b.c; c.fillRect(b.x*sx,b.y*sy,b.w*sx,b.h*sy);});
   c.fillStyle='#27ae60'; c.beginPath(); c.arc(MUSTER.x*sx,MUSTER.y*sy,4,0,7); c.fill();
   ZONES.forEach(z=>{ if(!z.r||(z.id in S.results)) return; c.fillStyle='#e0b800'; c.fillRect(z.x*sx-2,z.y*sy-2,4,4); });
+  if(S.oga){ c.fillStyle='#e74c3c'; S.oga.active.forEach(a=>{ c.beginPath(); c.arc(a.inc.x*sx,a.inc.y*sy,4+Math.sin(S.t*6),0,7); c.fill(); }); }
   if(S.guide&&S.guide.path&&guideOn){ c.strokeStyle='#0f7a4f'; c.lineWidth=2; c.setLineDash([3,2]); c.beginPath(); S.guide.path.forEach(([x,y],i)=>i?c.lineTo(x*sx,y*sy):c.moveTo(x*sx,y*sy)); c.stroke(); c.setLineDash([]); const T=S.guide.target; if(T){ c.fillStyle='#0f7a4f'; c.beginPath(); c.arc(T.x*sx,T.y*sy,4,0,7); c.fill(); } }
   const gp=$('guidePanel'), T=S.guide&&S.guide.target; if(guideOn&&T&&S.guide.path&&started&&!S.over&&$('prompt').classList.contains('hidden')){ gp.classList.remove('hidden'); const pth=S.guide.path, nx=pth[Math.min(3,pth.length-1)]; const dx=nx[0]-S.p.x, dy=nx[1]-S.p.y, fx=-Math.sin(yaw), fy=-Math.cos(yaw); const ang=Math.atan2(fx*dy-fy*dx, fx*dx+fy*dy); $('gArrow').style.transform=`rotate(${ang}rad)`; $('gText').textContent=`Next: ${T.name} · ${Math.max(1,Math.round(pathLen(pth)*K))} m`; } else gp.classList.add('hidden');
   const px=S.p.x*sx, py=S.p.y*sy; c.fillStyle='#e00'; c.beginPath(); c.moveTo(px-Math.sin(yaw)*7,py-Math.cos(yaw)*7); c.lineTo(px+Math.cos(yaw)*3.5,py-Math.sin(yaw)*3.5); c.lineTo(px-Math.cos(yaw)*3.5,py+Math.sin(yaw)*3.5); c.fill();
@@ -1986,8 +2005,9 @@ function openSettings(after){ SL.openSettings(openModal, ()=>{ closeModal(); aft
 function setHud(on){ ['hud','act','phoneBtn','camBtn','autoBtn','guideBtn','muteBtn','setBtn','hint'].forEach(id=>$(id).classList.toggle('hidden',!on)); if(!on){$('guidePanel').classList.add('hidden');$('prompt').classList.add('hidden');$('timer').classList.add('hidden');$('alarmv').classList.add('hidden');} }
 function showStart(){
   setHud(false); started=false; profile.role=null; newGame(); paused=true;
-  const m=openModal(`<p class="muted" style="margin:0 0 6px;font-weight:700">Choose a game</p><div class="games"><span class="gcard on"><span class="gi">🏭</span><b>Factory Site Induction</b><small>Workers & visitors</small></span><a class="gcard" href="kids-offline.html?world=home"><span class="gi">🏠🚌</span><b>Home → School Bus</b><small>Kids 6–12</small></a><a class="gcard" href="kids-offline.html?world=school"><span class="gi">🏫</span><b>School Safety</b><small>Kids 6–12</small></a></div><h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
-    <p class="muted">The safety induction you <b>play</b>, not a paper you tick. Walk the compound, make the right calls, spot the hazards, and survive your first shift.<br>Demo site: <i>Acme Manufacturing, Ikeja</i>.</p>
+  const m=openModal(`<p class="muted" style="margin:0 0 6px;font-weight:700">Choose a game</p><div class="games"><a class="gcard ${GAME_ID==='factory'?'on':''}" href="site-life-offline.html"><span class="gi">🏭</span><b>Factory Site Induction</b><small>Workers & visitors</small></a><a class="gcard ${GAME_ID==='factory-advanced'?'on':''}" href="site-life-offline.html?course=advanced"><span class="gi">🧗🏾</span><b>Advanced Site Course</b><small>Height, confined space, hot work…</small></a><a class="gcard ${GAME_ID==='oga'?'on':''}" href="site-life-offline.html?mode=oga"><span class="gi">🧔🏾</span><b>Oga Mode</b><small>Supervisors</small></a><a class="gcard" href="kids-offline.html?world=home"><span class="gi">🏠🚌</span><b>Home → School Bus</b><small>Kids 6–12</small></a><a class="gcard" href="kids-offline.html?world=school"><span class="gi">🏫</span><b>School Safety</b><small>Kids 6–12</small></a><a class="gcard" href="kids-offline.html?world=market"><span class="gi">🛒</span><b>Market & Road Trip</b><small>Kids 6–12</small></a><a class="gcard" href="kids-offline.html?world=water"><span class="gi">🏖️</span><b>Beach & Pool</b><small>Kids 6–12</small></a><a class="gcard" href="kids-offline.html?world=online"><span class="gi">📱</span><b>Online Safety</b><small>Kids 8–14</small></a></div><h1 style="margin:.1em 0">🦺 Site Life 3D</h1>
+    ${MODE==='oga'?`<div class="fb"><b>🧔🏾 Oga Mode.</b> You are the supervisor today. Workers will start doing unsafe things around the compound. Get there fast and stop them. Stop at least ${SITE.oga.pass} of ${SITE.oga.incidents.length} to pass.</div>`:COURSE?`<div class="fb"><b>🧗🏾 ${esc(COURSE.title)}.</b> ${esc(COURSE.about)}</div>`:''}
+    <p class="muted">The safety induction you <b>play</b>, not a paper you tick. Walk the compound, make the right calls, spot the hazards, and survive your first shift.<br>${SITE._custom?'Site':'Demo site'}: <i>${esc(SITE.name||'')}</i>.</p>
     <p><b>Your name</b></p><input id="nm" placeholder="e.g. Tunde Bakare" maxlength="40" value="${esc(profile.name)}">
     <p><b>Company</b> <span class="muted">(optional)</span></p><input id="co" placeholder="e.g. ABC Contractors Ltd" maxlength="60" value="${esc(profile.company)}">
     <p><b>Your character</b></p>
@@ -1995,13 +2015,15 @@ function showStart(){
     <p class="muted" style="margin:.6em 0 .3em">Shirt colour and skin tone</p>
     <div class="row">${SHIRTS.map(c=>`<button class="sw ${c===profile.shirt?'on':''}" data-c="${c}" style="background:${c}" aria-label="shirt colour"></button>`).join('')}</div>
     <div class="row" style="margin-top:6px">${SKINS.map(c=>`<button class="sw ${c===profile.skin?'on':''}" data-s="${c}" style="background:${c}" aria-label="skin tone"></button>`).join('')}</div>
-    <p><b>Role lottery 🎲</b> <span class="muted">Like Lagos Life's birth lottery, you don't choose.</span></p>
-    <div class="big" id="rolebox">🎲 ?</div><p class="muted" id="roletask"></p>
+    ${MODE==='oga'?`<p><b>Your role</b></p><div class="big" id="rolebox">🧔🏾 Supervisor (Oga)</div><p class="muted" id="roletask"></p>`:`<p><b>Role lottery 🎲</b> <span class="muted">Like Lagos Life's birth lottery, you don't choose.</span></p>
+    <div class="big" id="rolebox">🎲 ?</div><p class="muted" id="roletask"></p>`}
     ${SL.consent.html(false)}
     <div class="row" id="startRow" style="margin-top:10px"><button id="spin">Spin role</button><button class="primary" id="start" disabled>Start shift ▶</button><button id="stSet">⚙️ Language &amp; settings</button></div>
     <p class="muted" style="font-size:.85rem;margin-top:12px">🎮 <b>Computer:</b> WASD to walk, drag the mouse to look, E to interact, V to switch first/third person.<br>📱 <b>Phone:</b> drag the left side of the screen to walk, drag the right side to look, and tap the green button to interact.</p>`);
   showDashButton(m.querySelector('#startRow'));
   SL.consent.bind(m, null);
+  m.querySelectorAll('.gcard[href]').forEach(a=>{ const u=new URL(a.getAttribute('href'),location.href); for(const [k,v] of SL.QS) if(!['course','mode','world'].includes(k)) u.searchParams.set(k,v); a.href=u.href; });
+  if(MODE==='oga'){ profile.role={id:'supervisor',name:'Supervisor (Oga)',icon:'🧔🏾',task:SITE.oga.about}; m.querySelector('#spin').classList.add('hidden'); m.querySelector('#start').disabled=false; }
   m.querySelector('#stSet').onclick=()=>openSettings(showStart);
   m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{profile.sex=b.dataset.x; m.querySelectorAll('[data-x]').forEach(x=>x.classList.toggle('primary',x===b));});
   m.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{profile.shirt=b.dataset.c; m.querySelectorAll('[data-c]').forEach(x=>x.classList.toggle('on',x===b));});
@@ -2015,6 +2037,7 @@ function showStart(){
     if(!SL.consent.ok()){ const c=m.querySelector('.consent'); c.style.outline='3px solid var(--bad)'; c.scrollIntoView({block:'center'}); toast(tr('Please tick the privacy notice box to start.'),'bad'); return; }
     profile.name=(m.querySelector('#nm').value.trim()||'Guest').slice(0,40); profile.company=m.querySelector('#co').value.trim().slice(0,60);
     G.resetDynamic(); started=true; closeModal(); setHud(true);
+    if(MODE==='oga'){ toast('🧔🏾 You are the supervisor today. Watch for the red ⚠ STOP signs and get there fast.'); return; }
     toast('🛵 The okada has dropped you at the Main Gate. Your HSE Escort will show you round. Follow the arrows.');
     setTimeout(()=>toast('📱 Tap "Tasks" to see what to do. Follow the yellow ! markers.'),2600);
   };
