@@ -37,7 +37,7 @@ MAX_BODY = 32 * 1024
 PASSING = {"PASS", "PASSED", "GOLD", "SILVER", "BRONZE", "COMPLETE"}   # COMPLETE: Little Stars (no pass/fail for ages 3-6)
 GAMES = {"factory": "🏭 Factory induction", "factory-advanced": "🏗️ Factory (advanced)", "oga": "🦺 Oga Mode (supervisor)",
          "home": "🏠 Home → School Bus", "school": "🏫 School Safety", "market": "🛒 Market & Road", "water": "🏊 Water Safety",
-         "online": "📱 Online Safety", "little": "⭐ Little Stars (3–6)"}
+         "online": "📱 Online Safety", "little": "⭐ Little Stars (3–6)", "warehouse": "📦 Warehouse Shift"}
 KIDS_GAMES = {"home", "school", "market", "water", "online", "little"}
 CSV_FIELDS = ["id", "received", "game", "course", "name", "company", "role", "class", "result", "stars", "hazards", "mistakes",
               "where", "missed", "wrong", "zoneTimes", "room", "lang", "date", "expires", "status"]
@@ -707,7 +707,7 @@ def trainer_page(code):
 <p><button>Open room</button> <button type=button onclick="var c='';for(var i=0;i<5;i++)c+='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)];location.search='?room='+c">New random room</button></p></form></div></div></body></html>"""
     cj = json.dumps(code)
     return head(f"Trainer room {code}") + f"""</head><body><div class=w><h1>🧑‍🏫 Trainer room <span id=code>{e(code)}</span></h1>
-<div class=card><p>Send this link to trainees:</p><p><input id=share readonly onclick="this.select()"></p><p class=muted>Kids games: <span id=kshare></span></p>
+<div class=card><p>Send this link to trainees:</p><p><input id=share readonly onclick="this.select()"></p><p class=muted>Kids games: <span id=kshare></span></p><p class=muted>Warehouse Shift: <span id=wshare></span></p>
 <label>Your name (shown to trainees)</label><input id=tname value="Trainer" maxlength=40></div>
 <div class=card><h3>Trigger an event for everyone</h3><p>
 <button data-ev=fire_alarm>🔥 Fire alarm</button> <button data-ev=nepa>💡 NEPA (power cut)</button> <button data-ev=spill>🛢️ Spill</button> <button data-ev=rain>🌧️ Rain</button> <button data-ev=end style="background:var(--bad)">⏹️ End session</button></p><p id=msg class=muted></p></div>
@@ -720,6 +720,7 @@ if(!pid){{pid="t"+Math.random().toString(36).slice(2)+Date.now().toString(36);tr
 var base=location.origin+location.pathname.replace(/trainer\\/?$/,"");
 document.getElementById("share").value=base+"index.html?room="+ROOM;
 document.getElementById("kshare").textContent=base+"kids.html?world=school&room="+ROOM;
+document.getElementById("wshare").textContent=base+"warehouse.html?room="+ROOM;
 function msg(t){{document.getElementById("msg").textContent=t;}}
 function post(path,body){{return fetch("/api/room/"+ROOM+"/"+path,{{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify(body)}}).then(function(r){{return r.json();}});}}
 function hello(){{return post("state",{{pid:pid,name:document.getElementById("tname").value||"Trainer",role:"trainer",x:0,y:0,yaw:0,game:"trainer",zone:"",score:0}}).catch(function(){{}});}}

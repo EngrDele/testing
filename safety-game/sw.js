@@ -3,8 +3,8 @@
 // - Icons, manifest and the three.js CDN files: cache first. Other same-origin files: stale-while-revalidate.
 // - Never touches /api/ (results), /hse (dashboard) or /cert/ (certificates), or any non-GET request.
 // Bump VERSION when you change this file or the cached file list; old caches are deleted on activate.
-const VERSION = 'site-life-v2';
-const PAGES = ['index.html', 'kids.html', 'little.html', 'lite.html', 'builder.html'];
+const VERSION = 'site-life-v3';
+const PAGES = ['index.html', 'kids.html', 'little.html', 'warehouse.html', 'lite.html', 'builder.html'];
 const STATIC = ['manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const CDN = [
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',

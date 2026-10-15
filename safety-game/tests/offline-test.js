@@ -33,7 +33,7 @@ async function swTest(browser, stopServer) {
     await p.waitForTimeout(250);
   }
   const short = cached.map(u => u.replace(BASE, '').replace(/^https:\/\/[^/]+\/.*\//, 'cdn:')).sort();
-  for (const need of ['index.html', 'kids.html', 'little.html', 'lite.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'cdn:three.min.js', 'cdn:Sky.js'])
+  for (const need of ['index.html', 'kids.html', 'little.html', 'warehouse.html', 'lite.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'cdn:three.min.js', 'cdn:Sky.js'])
     short.includes(need) ? ok('cached ' + need) : fail('not cached: ' + need + ' (have ' + short.join(', ') + ')');
   const manifest = await p.evaluate(() => fetch('manifest.webmanifest').then(r => r.json()));
   manifest.name === 'Site Life' && manifest.display === 'standalone' && manifest.icons.length >= 2 ? ok('manifest: ' + manifest.name + ', ' + manifest.display) : fail('manifest ' + JSON.stringify(manifest));
@@ -43,7 +43,7 @@ async function swTest(browser, stopServer) {
 
   // network off AND server stopped: the games must still start, from the service worker cache only
   await stopServer(); await ctx.setOffline(true);
-  for (const url of ['index.html', 'kids.html?world=home', 'kids.html?world=school', 'little.html']) {
+  for (const url of ['index.html', 'kids.html?world=home', 'kids.html?world=school', 'little.html', 'warehouse.html']) {
     const q = await ctx.newPage(); const qe = [];
     q.on('pageerror', e => qe.push(e.message)); q.on('console', m => { if (m.type() === 'error') qe.push(m.text().slice(0, 200)); });
     await q.goto(BASE + url);

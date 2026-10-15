@@ -5,7 +5,8 @@ Usage (from safety-game/):
     python3 src/scorm.py --no-build   # package the offline files as they are
 
 Output: dist/scorm/site-life-factory.zip, site-life-kids-home.zip, site-life-kids-school.zip, one
-per extra kids world found in kids.html (market, water, online), and site-life-little.zip (Little Stars, 3-6).
+per extra kids world found in kids.html (market, water, online), site-life-little.zip (Little Stars, 3-6) and
+site-life-warehouse.zip (Warehouse Shift).
 
 Each zip holds imsmanifest.xml (SCORM 1.2, one SCO), a launch index.html that opens the offline single
 file (three.js inlined, so the LMS needs no internet access to our server or the CDNs) with the right
@@ -26,8 +27,9 @@ GAMES = [  # (package id, title, offline file, world)
     ('kids-water', 'Site Life Kids: Water Safety', 'kids-offline.html', 'water'),
     ('kids-online', 'Site Life Kids: Online Safety', 'kids-offline.html', 'online'),
     ('little', 'Site Life: Little Stars (ages 3-6)', 'little-offline.html', None),
+    ('warehouse', 'Site Life: Warehouse Shift', 'warehouse-offline.html', None),
 ]
-ALWAYS = {'factory', 'kids-home', 'kids-school', 'little'}
+ALWAYS = {'factory', 'kids-home', 'kids-school', 'little', 'warehouse'}
 
 
 def has_world(kids_src, world):
@@ -81,7 +83,7 @@ def launch(title, target):
 def main():
     if '--no-build' not in sys.argv and os.path.exists(P('tests', 'vendor', 'three.min.js')):
         subprocess.check_call([sys.executable, os.path.join(here, 'build.py'), P('tests', 'vendor', 'three.min.js'), P('tests', 'vendor', 'Sky.js')], cwd=root)
-    for f in ('site-life-offline.html', 'kids-offline.html', 'little-offline.html'):
+    for f in ('site-life-offline.html', 'kids-offline.html', 'little-offline.html', 'warehouse-offline.html'):
         if not os.path.exists(P(f)):
             sys.exit(f'{f} is missing: run  python3 src/build.py tests/vendor/three.min.js tests/vendor/Sky.js  first')
     kids_src = open(P('kids.html'), encoding='utf8').read()

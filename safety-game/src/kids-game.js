@@ -662,8 +662,12 @@ const KID_CARDS=[['home','🏠🚌','Home → School Bus'],['school','🏫','Sch
 function worldCards(){
   const pg=location.pathname.split('/').pop()||'kids.html';
   return `<p class="muted" style="margin:8px 0 6px;font-weight:700">Choose a kids game</p><div class="games">${KID_CARDS.map(([w,i,t])=>{ const u=new URLSearchParams(location.search); u.set('world',w);
-    return w===WORLD?`<span class="gcard on"><span class="gi">${i}</span><b>${esc(t)}</b><small>Playing now</small></span>`:`<a class="gcard" href="${esc(pg+'?'+u)}"><span class="gi">${i}</span><b>${esc(t)}</b><small>Kids 6–12</small></a>`; }).join('')}${littleCard()}</div>`;
+    return w===WORLD?`<span class="gcard on"><span class="gi">${i}</span><b>${esc(t)}</b><small>Playing now</small></span>`:`<a class="gcard" href="${esc(pg+'?'+u)}"><span class="gi">${i}</span><b>${esc(t)}</b><small>Kids 6–12</small></a>`; }).join('')}${littleCard()}${warehouseCard()}</div>`;
 }
+
+// Warehouse Shift (adults) is its own page as well; build.py points the offline copy at warehouse-offline.html
+const WAREHOUSE_PAGE='warehouse.html';
+function warehouseCard(){ const u=new URLSearchParams(location.search); u.delete('world'); const q=u.toString(); return `<a class="gcard" href="${esc(WAREHOUSE_PAGE+(q?'?'+q:''))}"><span class="gi">🏬📦</span><b>Warehouse Shift</b><small>Adults</small></a>`; }
 
 // Little Stars (ages 3–6) lives in its own page; build.py points the offline copy at little-offline.html
 const LITTLE_PAGE='little.html';

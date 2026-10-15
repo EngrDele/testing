@@ -8,7 +8,7 @@
 4. `TRANSCRIPT.md` (this folder): the owner's conversation with Claude that produced everything, with the owner's words verbatim.
 5. `../CONCEPT.md`: the original product idea and pitch.
 
-Last updated: 13 October 2026. Branch: `claude/lagos-safety-game-research-cq4tb4` in `EngrDele/testing`. **Not merged to `main` yet, and no pull request has been opened.** The owner has not asked for one.
+Last updated: 15 October 2026. Branch: `claude/lagos-safety-game-research-cq4tb4` in `EngrDele/testing`. **Not merged to `main` yet, and no pull request has been opened.** The owner has not asked for one.
 
 ---
 
@@ -31,6 +31,7 @@ Company safety inductions in Nigeria are usually "watch a video, then tick a pap
 | Beach & Pool | `kids.html?world=water` | Kids 6–12 | Buddy system, red flag, lifeguard, drowning response, life jackets |
 | Online Safety | `kids.html?world=online` | Kids 6–14 | Strangers, photo requests, scams, cyberbullying, passwords |
 | Little Stars | `little.html` | Children 3–6 with a parent | Tap-only, no reading, no losing. 10 scenes, sticker book, parent tips |
+| Warehouse Shift | `warehouse.html` | Warehouse staff, drivers, visitors | Lagos distribution centre in a clean "logistics dashboard" look: KPI tiles, inspect panel, shift stepper, live lists. 8 steps (gate & PPE → receiving → forklift check → racking → picking → battery charging → dispatch → fire alarm), 6 hidden hazards, live forklifts and trucks, near misses |
 | Site Builder | `builder.html` | HSE staff / sales | Draw a client's compound and write its questions, then play it in 3D |
 | Lite (2D) | `lite.html` | Fallback | Old 2D version when WebGL fails |
 
@@ -79,7 +80,8 @@ Each step was a request from the owner (see `TRANSCRIPT.md`), implemented, teste
 | 11 | "Suggest more additions and tutorials for agents" | `CLAUDE.md`, `ROADMAP.md`, automated tests | 0a1c828 |
 | 12 | "Implement all", plus research that keeps adding games | The whole roadmap (below), weekly routine, research backlog | b519060 … 5a1e876 |
 | 13 | Games for 3–6 year olds, "implement all" | Little Stars (10 scenes) | a4e7e6d |
-| 14 | Comprehensive documentation for handover | This folder | (this commit) |
+| 14 | Comprehensive documentation for handover | This folder | 06ccaa0 |
+| 15 | Owner sent a clean warehouse dashboard video ("see how clean this is… make it about warehouse") | Warehouse Shift episode (`warehouse.html`) in that clean style: own look, not the video's brand | (this commit) |
 
 Step 12 in detail:
 - engine split into `src/`;
@@ -119,7 +121,7 @@ Step 12 in detail:
 ## 5. Where we are (honest status)
 
 **Done and tested.** GitHub CI (`.github/workflows/site-life.yml`) runs on every push to the branch and passed on the latest commit (13 Oct 2026). All of these play to the end in the automated tests with no page errors:
-- the factory, advanced, Oga, builder, five kids worlds and Little Stars games;
+- the factory, advanced, Oga, builder, five kids worlds, Little Stars and Warehouse Shift games;
 - the server unit tests and smoke tests;
 - the accessibility, group-session, offline, SCORM and engine-extras tests.
 
@@ -165,11 +167,11 @@ node tests/playthrough.js little        # quick check; the full run takes 25–3
 ```
 
 Rules of thumb:
-- Edit `src/`, `sites/`, `src/i18n/`, `server/` and `tests/`. Never edit the generated pages (`index.html`, `kids.html`, `little.html`, `builder.html`, the `*-offline.html` files); rebuild them and commit them.
+- Edit `src/`, `sites/`, `src/i18n/`, `server/` and `tests/`. Never edit the generated pages (`index.html`, `kids.html`, `little.html`, `warehouse.html`, `builder.html`, the `*-offline.html` files); rebuild them and commit them.
 - New user-facing English text needs a Pidgin entry in `src/i18n/pcm.json`.
 - New games go alongside the old ones, with a selector card.
 - Every question must have exactly one correct answer that matches Nigerian law or recognised good practice (ILO, ISO 45001, FRSC, WHO).
-- Republish the artifact with `files: {lite.html, kids.html, little.html, builder.html}` and omit `capabilities` to keep the stored database rules and the room capability.
+- Republish the artifact with `files: {lite.html, kids.html, little.html, warehouse.html, builder.html}` and omit `capabilities` to keep the stored database rules and the room capability.
 - The owner writes by voice: expect transcription errors ("TDD" meant 3D, "GT6" probably meant GTA, "tailcat" meant Tailscale) and read for intent.
 - Talk to the owner in plain English, short sentences, practical steps. They host on their own Windows PC and share links by WhatsApp.
 
@@ -181,13 +183,13 @@ safety-game/
   docs/TRANSCRIPT.md     ← owner ↔ Claude conversation
   CLAUDE.md              ← technical guide (read next)
   ROADMAP.md CONCEPT.md HOSTING-OPTIONS.md TUNNEL-GUIDE.md
-  src/                   ← all sources (factory.html, engine.js, common.js, room.js, kids-*, little-*, builder.html, build.py, scorm.py, i18n/)
+  src/                   ← all sources (factory.html, engine.js, common.js, room.js, kids-*, little-*, warehouse-*, builder.html, build.py, scorm.py, i18n/)
   sites/acme-ikeja.json  ← the built-in factory site (layout, questions, advanced course, Oga incidents)
   server/                ← results server + VPS setup + guide
   deploy/                ← Google Sheets + Cloudflare Pages option
   research/              ← IDEAS.md (backlog), LOG.md, plans/
   tests/                 ← Playwright + server tests
-  index.html kids.html little.html builder.html *-offline.html   ← generated
+  index.html kids.html little.html warehouse.html builder.html *-offline.html   ← generated
   sw.js manifest.webmanifest icons/                              ← installable app
 ../.claude/agents/game-researcher.md   ← weekly research agent instructions
 ../.github/workflows/site-life.yml     ← CI

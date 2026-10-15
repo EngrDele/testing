@@ -16,6 +16,7 @@ All items below have a first version built, except 13 (real client scans: the `p
 | 9 | Multiplayer | ✅ group code (server polling or artifact `room`); **Next:** voice chat, trainer view of everyone on the map |
 | 10 | More kids worlds | ✅ market, water, online |
 | 10b | Little Stars (ages 3–6) | ✅ `little.html`: 10 tap-only scenes, stickers, parent tips, Pidgin. **Next:** body-safety scene review by a child-protection professional; recorded voice-overs |
+| 10c | Warehouse Shift | ✅ `warehouse.html`: clean dashboard-style episode (8 steps, 12 questions, forklift pre-use check, 6 hidden hazards, live forklifts/trucks, fire alarm), Pidgin, group sessions, SCORM. **Next:** real-phone check with the owner; make the layout a site file so a client's warehouse can be drawn in the builder |
 | 11 | Class / family codes | ✅ `?class=`, `/hse/class` |
 | 12 | glTF characters | 🟡 hook ready (`makeHumanGLTF`, `SL_AVATAR_URL`); needs licensed avatar files |
 | 13 | Real client sites | 🟡 hook ready (`placeSiteModel`); needs a scan |

@@ -3,11 +3,12 @@
 Sources:   sites/acme-ikeja.json (built-in factory site), src/i18n/*.json (translations),
            src/factory.html (factory game shell + logic), src/engine.js (shared 3D engine),
            src/common.js (shared features), src/kids-game.js (kids games), src/kids-shell.html,
-           src/little-game.js + src/little-shell.html (Little Stars, ages 3-6)
-Generated: index.html, kids.html, little.html, builder.html, and with three.js paths also
-           site-life-offline.html, kids-offline.html, little-offline.html
+           src/little-game.js + src/little-shell.html (Little Stars, ages 3-6),
+           src/warehouse-game.js + src/warehouse-shell.html (Warehouse Shift)
+Generated: index.html, kids.html, little.html, warehouse.html, builder.html, and with three.js paths also
+           site-life-offline.html, kids-offline.html, little-offline.html, warehouse-offline.html
 
-Usage: python3 src/build.py                                              -> index.html, kids.html, little.html, builder.html
+Usage: python3 src/build.py                                              -> index.html, kids.html, little.html, warehouse.html, builder.html
        python3 src/build.py tests/vendor/three.min.js tests/vendor/Sky.js -> also the offline single files
 """
 import os, sys
@@ -51,10 +52,18 @@ def little_page():
                  .replace('/*@@ENGINE@@*/', engine)
                  .replace('/*@@LITTLE@@*/', rd('little-game.js')))
 
-idx, kids, little = factory_page(), kids_page(), little_page()
-wr('index.html', idx); wr('kids.html', kids); wr('little.html', little)
+def warehouse_page():
+    # the warehouse shell has its own clean CSS (the factory CSS is not used)
+    shell = rd('warehouse-shell.html')
+    return (shell.replace('<!--@@CDN@@-->', CDN)
+                 .replace('/*@@COMMON@@*/', common)
+                 .replace('/*@@ENGINE@@*/', engine)
+                 .replace('/*@@WAREHOUSE@@*/', rd('warehouse-game.js')))
+
+idx, kids, little, ware = factory_page(), kids_page(), little_page(), warehouse_page()
+wr('index.html', idx); wr('kids.html', kids); wr('little.html', little); wr('warehouse.html', ware)
 wr('builder.html', rd('builder.html').replace('/*@@SITE@@*/', site_js))
-print('built index.html, kids.html, little.html, builder.html')
+print('built index.html, kids.html, little.html, warehouse.html, builder.html')
 
 if len(sys.argv) >= 3:
     three = open(sys.argv[1], encoding='utf8').read().replace('</script', '<\\/script')
@@ -63,7 +72,11 @@ if len(sys.argv) >= 3:
     # SL_OFFLINE_FILE: common.js then skips the service worker, manifest and /api/result (the file may be
     # opened from WhatsApp, a USB stick or an LMS package, not from our server)
     off = lambda s: s.replace(CDN, inline).replace('const SL_I18N = ', 'var SL_OFFLINE_FILE = true;\nconst SL_I18N = ', 1)
-    wr('site-life-offline.html', off(idx).replace('href="kids.html?world=', 'href="kids-offline.html?world=').replace('href="little.html', 'href="little-offline.html').replace('href="index.html', 'href="site-life-offline.html').replace('<title>Site Life 3D</title>', '<title>Site Life 3D (offline)</title>'))
-    wr('kids-offline.html', off(kids).replace('href="index.html', 'href="site-life-offline.html').replace("'little.html'", "'little-offline.html'"))
-    wr('little-offline.html', off(little).replace('href="index.html', 'href="site-life-offline.html').replace('href="kids.html?world=', 'href="kids-offline.html?world='))
+    wr('site-life-offline.html', off(idx).replace('href="kids.html?world=', 'href="kids-offline.html?world=').replace('href="little.html', 'href="little-offline.html').replace('href="warehouse.html', 'href="warehouse-offline.html').replace('href="index.html', 'href="site-life-offline.html').replace('<title>Site Life 3D</title>', '<title>Site Life 3D (offline)</title>'))
+    wr('kids-offline.html', off(kids).replace('href="index.html', 'href="site-life-offline.html').replace("'little.html'", "'little-offline.html'").replace("'warehouse.html'", "'warehouse-offline.html'"))
+    wr('little-offline.html', off(little).replace('href="index.html', 'href="site-life-offline.html').replace('href="kids.html?world=', 'href="kids-offline.html?world=').replace('href="warehouse.html', 'href="warehouse-offline.html'))
+    # the warehouse page builds its links from PG (see src/warehouse-game.js)
+    pg = "const PG={index:'index.html',kids:'kids.html',little:'little.html'};"
+    assert pg in ware, 'warehouse page links (PG) not found'
+    wr('warehouse-offline.html', off(ware).replace(pg, "const PG={index:'site-life-offline.html',kids:'kids-offline.html',little:'little-offline.html'};").replace('<title>Warehouse Shift</title>', '<title>Warehouse Shift (offline)</title>'))
     print('built offline files')

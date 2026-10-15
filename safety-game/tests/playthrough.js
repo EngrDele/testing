@@ -1,5 +1,5 @@
 // End-to-end playthrough of all three games in headless Chromium.
-// Usage (from safety-game/):  bash tests/setup.sh  &&  node tests/playthrough.js [factory|advanced|oga|home|school|market|water|online|little ...]
+// Usage (from safety-game/):  bash tests/setup.sh  &&  node tests/playthrough.js [factory|advanced|oga|home|school|market|water|online|little|warehouse ...]
 // Env: BASE_URL (default file://.../index.html dir), HEADED=1 to watch.
 // The games are driven by calling update() directly: software WebGL in CI renders ~1 fps,
 // so waiting on requestAnimationFrame is far too slow (see CLAUDE.md "Testing").
@@ -9,7 +9,7 @@ const ROOT = path.resolve(__dirname, '..');
 const VENDOR = path.join(__dirname, 'vendor');
 const BASE = process.env.BASE_URL || 'file://' + ROOT + '/';
 const KIDS = ['home', 'school', 'market', 'water', 'online'];
-const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'advanced', 'oga', 'builder', ...KIDS, 'little'];
+const want = process.argv.slice(2).length ? process.argv.slice(2) : ['factory', 'advanced', 'oga', 'builder', ...KIDS, 'little', 'warehouse'];
 // Screenshots of the newer kids worlds (player x, y, camera yaw), written to tests/out/<world>-<n>.png
 const SHOTS = { market: [[120, 500, -0.6], [700, 690, 0.4], [1060, 1060, -1.2]], water: [[150, 480, -0.7], [360, 810, 2.6], [1250, 790, 2.9]], online: [[600, 560, 0.3], [330, 320, 0.2], [700, 760, 2.8]] };
 const LANG = process.env.GAME_LANG || '';               // e.g. GAME_LANG=pcm to play in Pidgin
@@ -247,6 +247,108 @@ async function little(browser) {
   await p.close();
 }
 
+// Warehouse Shift: plays every stop with the right answers (plus one deliberate wrong answer to check the feedback),
+// does the FL-03 pre-use check, finds all 6 hazards and the 3 safe decoys through the inspect panel, runs the fire alarm
+// to the assembly point, and checks the pass screen and the posted result. Screenshots (desktop 1280x800 and phone
+// 390x844) of the start screen, overview, forklift inspect panel, a question card, the hazards tab and the end screen
+// go to tests/out/warehouse-*.png.
+async function warehouse(browser) {
+  const OUT = path.join(__dirname, 'out'); fs.mkdirSync(OUT, { recursive: true });
+  const DESK = { width: 1280, height: 800 }, PHONE = { width: 390, height: 844 };
+  const p = await page(browser, BASE + 'warehouse.html', DESK);
+  await p.evaluate(() => { localStorage.removeItem('sl-wh-profile'); requestAnimationFrame = () => 0; });   // the test drives the frames
+  const st = () => p.evaluate(() => WH.state());
+  const stepN = (n, dt = .05) => p.evaluate(([n, dt]) => WH.step(n, dt), [n, dt]);
+  const shot = async (name, both = true) => {
+    for (const [vp, tag] of both ? [[DESK, 'desktop'], [PHONE, 'phone']] : [[DESK, 'desktop']]) {
+      await p.setViewportSize(vp); await p.evaluate(() => { dispatchEvent(new Event('resize')); WH.step(30, .05); WH.render(); });
+      await p.screenshot({ path: path.join(OUT, `warehouse-${name}-${tag}.png`), timeout: 240000 });
+    }
+    await p.setViewportSize(DESK); await p.evaluate(() => { dispatchEvent(new Event('resize')); WH.render(); });
+  };
+  await stepN(3);
+  await p.fill('#nm', 'Ada Okafor'); await p.fill('#co', 'QA Logistics'); await p.check('#slConsent');
+  await shot('start');
+  await p.click('#start');
+  await p.evaluate(() => { window.__res = []; const o = SL.post; SL.post = (x, cb) => { window.__res.push(x); return o(x, cb); }; });   // capture posted results
+  await stepN(60);
+  await p.click('#site'); await stepN(30);   // the whole site, like a logistics dashboard
+  await shot('overview');
+  await p.click('#zH'); await stepN(30);
+  await p.evaluate(() => WH.inspect('FL-01')); await stepN(30);
+  if (!(await p.$('#panel:not(.hidden) h3'))) fail('warehouse: inspect panel did not open for FL-01');
+  await shot('inspect');
+  await p.click('#pClose');
+  const okTexts = new Set();
+  let wrongDone = false, qShot = false, hazDone = false, guard = 0;
+  while (guard++ < 80) {
+    const s = await st(); if (s.over) break;
+    if (s.q) {   // a question card is open
+      const correct = await p.evaluate(() => WH.correct());
+      if (!qShot) { qShot = true; await shot('question'); }
+      if (!wrongDone && s.q === 'reverse') {   // one deliberate wrong answer: red feedback, the right answer explained, score drops
+        wrongDone = true; const wrongI = correct === 0 ? 1 : 0;
+        await p.click(`.modal .opts [data-i="${wrongI}"]`);
+        const fb = await p.evaluate(() => ({ bad: !!document.querySelector('.modal .fb.bad'), also: !!document.querySelector('.modal .fb .also'), cont: !!document.querySelector('#cont:not(.hidden)'), okShown: !!document.querySelector('.modal .opts button.ok') }));
+        const s2 = await st();
+        if (!fb.bad || !fb.also || !fb.cont || !fb.okShown || s2.wrong !== 1 || s2.score !== 92) fail('warehouse: wrong-answer feedback ' + JSON.stringify({ fb, s2 }));
+        else console.log('  wrong answer: feedback ok, score', s2.score);
+        await shot('feedback', false);
+      } else {
+        okTexts.add(s.q); await p.click(`.modal .opts [data-i="${correct}"]`);
+        if (!(await p.$('.modal .fb:not(.bad)'))) fail('warehouse: no positive feedback for ' + s.q);
+      }
+      await p.click('#cont'); await stepN(2); continue;
+    }
+    if (s.modal) { if (await p.$('#cont')) { await p.click('#cont'); await stepN(2); continue; } fail('warehouse: unexpected modal'); break; }
+    if (s.fl.open && !s.fl.done && s.panel === 'FL-03') {   // pre-use check: tap each item, then tag it out
+      const n = (await p.$$('#panel [data-chk]')).length;   // the panel re-renders after each tap, so look each one up again
+      for (let i = 0; i < n; i++) await p.click(`#panel [data-chk="${i}"]`);
+      const fc = await p.evaluate(() => WH.flCorrect());
+      await p.click(`#panel [data-fl="${fc}"]`); await stepN(2); continue;
+    }
+    const sta = await p.evaluate(() => WH.station());
+    if (!sta) { await stepN(10); continue; }
+    if (sta.id === 'emergency' && !hazDone) {   // find every hazard (and clear the decoys) before the end-of-shift briefing
+      hazDone = true;
+      for (const h of await p.evaluate(() => WH.hazards())) {
+        await p.evaluate((id) => WH.inspect(id), h.id); await stepN(2);
+        await p.click(h.hz ? '#repHaz' : '#repOk');
+        const ok = await p.evaluate(() => !!document.querySelector('#panel .check .fb:not(.bad)'));
+        if (!ok) fail('warehouse: hazard decision feedback missing for ' + h.id);
+      }
+      await p.click('#pClose'); await stepN(120); await p.click('#zH');   // let the NEPA blackout pass
+      await p.click('[data-tab="hazards"]'); await stepN(30);
+      await shot('hazards');
+      const hs = await st(); if (hs.hazards !== 6) fail('warehouse: hazards found ' + hs.hazards);
+      continue;
+    }
+    if (sta.id === 'assembly') { await p.evaluate(() => WH.teleport(-33, -8)); await stepN(4); await stepN(40, .05); continue; }
+    await p.evaluate(([x, z]) => WH.teleport(x, z), [sta.x, sta.z]); await stepN(sta.id === 'emergency' ? 40 : 4);
+  }
+  await stepN(40, .05);
+  const s = await st();
+  const title = await p.$eval('#endCard h1', e => e.innerText).catch(() => '');
+  const passT = await p.evaluate(() => SL.t('Shift complete: you passed!'));
+  console.log('warehouse', JSON.stringify(s), title);
+  if (!s.over || title !== passT) fail('warehouse did not pass: ' + title);
+  if (s.near !== 0) fail('warehouse: unexpected near misses ' + s.near);
+  await shot('end');
+  const res = await p.evaluate(() => window.__res);
+  if (res.length !== 1) fail('warehouse: expected 1 posted result, got ' + res.length);
+  else {
+    const r = res[0]; console.log('  result:', JSON.stringify(r));
+    const want = { game: 'warehouse', name: 'Ada Okafor', company: 'QA Logistics', role: 'Warehouse associate', result: 'PASS', score: 92, hazards: '6/6', mistakes: 1 };
+    for (const [k, v] of Object.entries(want)) if (r[k] !== v) fail(`warehouse: result.${k} = ${JSON.stringify(r[k])}, want ${JSON.stringify(v)}`);
+    if (!r.where.includes('Receiving dock') || r.wrong.length !== 1 || r.missed.length !== 0) fail('warehouse: where/wrong/missed ' + JSON.stringify([r.where, r.wrong, r.missed]));
+    if (Object.keys(r.zoneTimes || {}).length !== 8) fail('warehouse: zoneTimes should have 8 steps ' + JSON.stringify(r.zoneTimes));
+    if (r.lang !== (LANG || 'en')) fail('warehouse: lang ' + r.lang);
+  }
+  await collectMisses(p);
+  if (p.errs.length) fail('warehouse errors: ' + p.errs.join(' | '));
+  await p.close();
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: !process.env.HEADED, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
@@ -256,6 +358,7 @@ async function little(browser) {
     if (want.includes('builder')) await builder(browser);
     for (const w of KIDS) if (want.includes(w)) await kids(browser, w);
     if (want.includes('little')) await little(browser);
+    if (want.includes('warehouse')) await warehouse(browser);
   } catch (e) { fail(e.stack || e.message); }
   await browser.close();
   if (LANG) { fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true }); fs.writeFileSync(path.join(__dirname, 'out', 'missing-' + LANG + '.json'), JSON.stringify([...MISSES].sort(), null, 1)); console.log('untranslated strings seen:', MISSES.size, '-> tests/out/missing-' + LANG + '.json', '(plus', RECHECKED.size, 'already-translated strings re-checked by the page)'); }

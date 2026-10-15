@@ -32,6 +32,29 @@ const fail = (m) => { console.error('FAIL:', m); process.exitCode = 1; };
     console.log('trainee got NEPA event:', nepa);
     if (!nepa) fail('event did not reach the trainee');
     for (const p of [a, b]) if (p.errs.length) fail('page errors: ' + p.errs.join(' | '));
+    await a.close(); await b.close();
+    // Warehouse Shift: same server, its own group code; the trainer sends a spill
+    const openW = async (name, extra) => {
+      const p = await browser.newPage({ viewport: { width: 800, height: 600 } });
+      for (const f of ['three.min.js', 'Sky.js']) await p.route('**/' + f, r => r.fulfill({ body: fs.readFileSync(path.join(VENDOR, f)), contentType: 'application/javascript' }));
+      p.errs = []; p.on('pageerror', e => p.errs.push(e.message));
+      await p.goto(`http://localhost:${PORT}/warehouse.html?room=WARE1${extra}`, { timeout: 120000 }); await p.waitForTimeout(3500);
+      await p.evaluate(() => { window.requestAnimationFrame = () => 0; });
+      await p.fill('#nm', name); await p.check('#slConsent'); await p.click('#start'); await p.waitForTimeout(2500);
+      return p;
+    };
+    const wa = await openW('Trainee Chidi', ''), wb = await openW('Trainer Bisi', '&trainer=1');
+    await wa.evaluate(() => WH.teleport(-20, 10)); await wa.waitForTimeout(2500);
+    const wsa = await wa.evaluate(() => SLRoom.players.map(p => p.name + '@' + p.game)), wsb = await wb.evaluate(() => SLRoom.players.map(p => p.name + '@' + Math.round(p.x)));
+    console.log('warehouse trainee sees', wsa, '· trainer sees', wsb);
+    if (!wsa.includes('Trainer Bisi@warehouse') || !wsb.includes('Trainee Chidi@-400')) fail('warehouse players do not see each other');
+    if (!(await wb.evaluate(() => !!document.getElementById('trainBtn')))) fail('warehouse trainer button missing');
+    await wb.evaluate(() => SLRoom.trigger('spill')); await wa.waitForTimeout(3000);
+    const spill = await wa.evaluate(() => S.spill);
+    console.log('warehouse trainee got the spill event:', spill);
+    if (!spill) fail('warehouse event did not reach the trainee');
+    await wa.evaluate(() => WH.step(2, .05));   // draws the other player
+    for (const p of [wa, wb]) if (p.errs.length) fail('warehouse page errors: ' + p.errs.join(' | '));
   } catch (e) { fail(e.stack || e.message); }
   await browser.close(); srv.kill(); fs.rmSync(data, { recursive: true, force: true });
   console.log(process.exitCode ? 'ROOM TEST FAILED' : 'ROOM TEST PASSED');
