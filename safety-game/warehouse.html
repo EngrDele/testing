@@ -1979,7 +1979,7 @@ const FL=[], TRUCKS=[], NPC={}, NPCS=[];
 let TRUCK_N=2051; const DEST=['Ibadan','Abeokuta','Ikeja','Benin','Ota','Ilorin'], FROM=['Apapa port','Tin Can port','Kano','Onitsha','Aba'];
 function buildActors(){
   const dyn=G.dyn;
-  P.obj=makePerson({shirt:'#e9ecf5',pants:'#2f3a66',skin:SKINS[2],vest:'#ffd23f',hatC:'#2f5ef0'}); P.obj.userData.vest.visible=false; dyn.add(P.obj);
+  P.obj=makePerson({shirt:'#e9ecf5',pants:'#2f3a66',skin:SKINS[2],vest:'#ffd23f',hatC:'#2f5ef0'}); P.obj.userData.vest.visible=false; dyn.add(P.obj); addXray(P.obj);
   // forklifts: FL-01 dock aisle, FL-02 aisle A1 (both drive), FL-03 parked for the pre-use check, FL-04 charging
   const mk=(id,o)=>{ const g=makeForklift(o); dyn.add(g); const f={id,obj:g,...o,dir:1,stop:0,clear:0,wait:0,carry:!!o.carry,lift:0,bat:o.bat||.8,state:o.state||'move',speed:0}; FL.push(f); return f; };
   mk('FL-01',{driver:'Chidi',skin:SKINS[0],ax:'x',a:-12.5,b:12.5,c:-6,area:'Dock aisle',x:-3,z:-6,v:2.4,carry:true,bat:.74});
@@ -2544,7 +2544,18 @@ function guideUpdate(dt,st){
     while(want<=acc+L2&&n<40){ const k=(want-acc)/L2, x=a[0]+(b[0]-a[0])*k, z=a[1]+(b[1]-a[1])*k; if(Math.hypot(x-st.x,z-st.z)<1.2) break; Q4.setFromAxisAngle(Y,ry); M.compose(new THREE.Vector3(x,.05,z),Q4,Sc); ch.setMatrixAt(n++,M); want+=sp; } acc+=L2; }
   ch.count=n; ch.instanceMatrix.needsUpdate=true;
 }
-function render(){ G.renderer.render(G.scene,G.camera); updateTags(); }
+// X-ray: wherever a truck, rack or wall is in front of the player, the hidden part shows as a blue silhouette.
+// Clones of the player's meshes use depthFunc GreaterDepth (drawn only where something nearer already is) and
+// render before the player's own meshes (renderOrder 1 < 2), so the player never x-rays through itself.
+function addXray(root){
+  const xm=new THREE.MeshBasicMaterial({color:new THREE.Color('#3d6bff'),depthWrite:false,depthFunc:THREE.GreaterDepth,toneMapped:false,fog:false});
+  const meshes=[]; root.traverse(o=>{ if(o.isMesh&&!o.userData.xray) meshes.push(o); });
+  const pairs=meshes.map(o=>{ o.renderOrder=2; const c=new THREE.Mesh(o.geometry,xm); c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale);
+    c.renderOrder=1; c.castShadow=c.receiveShadow=false; c.userData.xray=true; o.parent.add(c); return [o,c]; });
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.75,32).rotateX(-Math.PI/2),xm); ring.position.y=.06; ring.renderOrder=1; ring.userData.xray=true; root.add(ring);
+  root.userData.xray=pairs;
+}
+function render(){ const xr=P.obj&&P.obj.userData.xray; if(xr) for(const [o,c] of xr) c.visible=o.visible; G.renderer.render(G.scene,G.camera); updateTags(); }
 let last=performance.now();
 function tick(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(!G) return; if(started&&!modalOpen()) SL.fps.tick(dt); update(dt); render(); }
 function loop(now){ tick(now); requestAnimationFrame(loop); }
