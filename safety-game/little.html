@@ -434,10 +434,12 @@ const SL = (() => {
   const isClaude = () => /claude\.ai|claudeusercontent/.test(location.hostname);
   const onWeb = () => /^https?:$/.test(location.protocol) && !isClaude();
   const ownSite = () => onWeb() && !lms.active && typeof SL_OFFLINE_FILE === 'undefined'; // our own server (not an LMS, not a copied offline file)
+  // static hosting (Cloudflare Pages etc., set by src/package_site.py): web pages without our Python server behind them
+  const hasServer = () => ownSite() && typeof SL_STATIC_HOST === 'undefined';
   const sheetsUrl = () => QS.get('results') || '';
   function targets() {
     const t2 = [];
-    if (ownSite()) t2.push({ url: 'api/result', mode: 'json' });
+    if (hasServer()) t2.push({ url: 'api/result', mode: 'json' });
     if (sheetsUrl()) t2.push({ url: sheetsUrl(), mode: 'sheets' });
     return t2;
   }
@@ -544,7 +546,7 @@ const SL = (() => {
     return done(any ? 'sent' : 'queued', id, json);
   }
   // Link to the printable certificate for a result id from our server; null when there is no server.
-  const certLink = (id) => (id != null && id !== '' && ownSite()) ? 'cert/' + encodeURIComponent(id) : null;
+  const certLink = (id) => (id != null && id !== '' && hasServer()) ? 'cert/' + encodeURIComponent(id) : null;
 
   addEventListener('online', () => queue.flush());
   const flushSoon = () => setTimeout(() => queue.flush(), 1500);
@@ -565,7 +567,7 @@ const SL = (() => {
 
   applyCss();
   return { QS, store, t, LANGS, get lang() { return lang; }, setLang, misses, consent, settings, quality, markerColor, fps, openSettings, caption, speak, stopSpeak,
-    post, queue, get lastId() { return lastId; }, get lastResponse() { return lastResponse; }, certLink, lms, onWeb, ownSite, isClaude, escH };
+    post, queue, get lastId() { return lastId; }, get lastResponse() { return lastResponse; }, certLink, lms, onWeb, ownSite, hasServer, isClaude, escH };
 })();
 const tr = SL.t;
 

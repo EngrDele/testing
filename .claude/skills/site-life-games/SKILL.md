@@ -53,9 +53,15 @@ Check the content against `references/content-safety.md`. Every question needs e
 - Run the new game in English and in Pidgin (`GAME_LANG=pcm`), plus one existing game to prove nothing broke. Browser tests are slow (software WebGL), so run them one at a time.
 - Take phone (390×844) and desktop screenshots and **look at them**. Fix anything cramped, hidden or ugly, including the player being hidden behind objects.
 
-### 5. Record and hand over
+### 5. Publish a browser link (always)
+The owner shares games by **sending a browser link**, so every new game ends with a link anyone can open. Follow `references/publishing.md`:
+- **Cloudflare Pages (main route):** push your branch. The GitHub workflow "Publish games (Cloudflare Pages)" (`.github/workflows/deploy-pages.yml`) uploads the public files (`src/package_site.py` → `dist/site/`) and prints the **Play link** for your branch. Read the link from the run and give it to the owner with the exact page, for example `https://<branch-alias>.site-life-games.pages.dev/kids.html?world=flood`.
+- **Before pushing,** check the static copy works: `python3 src/package_site.py`, serve `dist/site` and play the new game with the `run-safety-game` driver (`base http://localhost:8095/`).
+- If the run says "Cloudflare not set up", say so and point the owner to Option C in `safety-game/deploy/cloudflare-pages/README.md`. Meanwhile give the claude.ai artifact link if you can publish it, and remind them that `SHARE-LINK.bat` gives a quick Cloudflare link from their PC.
+
+### 6. Record and hand over
 - Update `research/IDEAS.md` (move the idea to Built), `research/LOG.md` (dated entry), and the games tables in `CLAUDE.md` and `docs/HANDOVER.md`.
-- Commit (including the regenerated pages), push your branch, and tell the owner in plain words: what it is, the age, how to open it, what was tested, and what still needs a human check.
+- Commit (including the regenerated pages), push your branch, and tell the owner in plain words: what it is, the age, **the play link**, what was tested, and what still needs a human check.
 - If you have the Artifact tool and the owner uses the claude.ai link, republish with every page in `files` (see `CLAUDE.md`).
 
 ## References
@@ -64,3 +70,4 @@ Check the content against `references/content-safety.md`. Every question needs e
 - `references/content-safety.md`: getting the safety advice right; sensitive topics; privacy (NDPA 2023) and children's data.
 - `references/idea-bank.md`: starter ideas by age, with the real danger behind each.
 - `references/suggesting.md`: how to present ideas to the owner and score them.
+- `references/publishing.md`: getting a browser link (Cloudflare Pages per branch, a quick Cloudflare tunnel from the owner's PC, the claude.ai artifact) and how to verify it.

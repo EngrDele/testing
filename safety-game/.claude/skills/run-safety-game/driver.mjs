@@ -10,6 +10,7 @@
 //   EOF
 // Commands:
 //   serve [port]        start the results server (python3 server/sitelife_server.py, HSE_KEY=drive) and use http://localhost:port/
+//   base <url>         load pages from another address (e.g. dist/site served statically, or the Cloudflare link)
 //   open <page?query>   load a page (file:// unless `serve` ran). three.js/Sky.js are served from tests/vendor (CDNs are blocked)
 //   start [name]        fill the start screen (#nm, consent, factory role spin) and press #start
 //   step [n] [dt]       advance the game n frames of dt seconds (default 30 × 0.05) and render once
@@ -63,6 +64,7 @@ const cmds = {
     for (let i = 0; i < 40; i++) { try { const r = await fetch(`http://localhost:${port}/`); if (r.ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
     base = `http://localhost:${port}/`; out('server on', base, '(dashboard: hse?key=drive)');
   },
+  async base(url) { base = url.endsWith('/') ? url : url + '/'; out('base', base); },   // e.g. a static copy: python3 -m http.server -d dist/site
   async open(p = 'index.html') {
     await page.goto(base + p, { timeout: 120000 });
     await page.waitForFunction(() => !document.getElementById('loading') && (document.querySelector('#start') || window.WH || window.LS), null, { timeout: 120000 }).catch(() => {});

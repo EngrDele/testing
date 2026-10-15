@@ -57,6 +57,8 @@ All the games are linked from cards on the start screens. The owner insisted tha
 - **Weekly research routine**: every Monday at 08:52 Lagos time, a fresh cloud session researches safety problems, adds ideas, builds one new game, tests it and pushes a `research/<date>-<slug>` branch. It never opens PRs and never changes existing games. The routine is a claude.ai Routine named "Site Life weekly game research", and its agent instructions are in `.claude/agents/game-researcher.md`.
 
 ### Where it runs
+- **Cloudflare Pages (main way to share a link):** GitHub publishes the games on every push (`.github/workflows/deploy-pages.yml`). `main` → `https://site-life-games.pages.dev`; every branch gets its own preview link, shown in the run as "Play link". **Needs a one-time owner setup** (two GitHub secrets; see `deploy/cloudflare-pages/README.md`, Option C). Until then the run says "Cloudflare not set up".
+- **Quick Cloudflare link from the owner's PC:** `SHARE-LINK.bat` (results server + `cloudflared` tunnel → `https://….trycloudflare.com`, full dashboard and certificates).
 - **claude.ai artifact**: https://claude.ai/artifact/JMb4DRzswUXTT1hCFWf4T6. It is private, so the owner shares it from the page's Share menu. Only people in the owner's organization, or people invited to it, can open it, and outsiders can view but not save results.
 - **Owner's own PC**: `START-SERVER.bat` (Windows) or `start-server.sh`, then a public link through a VS Code port-forward / dev tunnel (see `TUNNEL-GUIDE.md`).
 - **VPS**: `server/setup-ubuntu.sh` (Caddy with automatic HTTPS, systemd). See `server/REMOTE-SERVER-GUIDE.md`.

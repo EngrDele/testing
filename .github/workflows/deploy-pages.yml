@@ -1,0 +1,74 @@
+# Publish the Site Life games to Cloudflare Pages and print a browser link anyone can open.
+#
+# - Every push that touches safety-game/ is published. The production link (https://<project>.pages.dev)
+#   comes from `main`; every other branch gets its own preview link (https://<branch-alias>.<project>.pages.dev),
+#   so each new game an agent builds on its own branch can be played before it is merged.
+# - One-time setup by the owner (see safety-game/deploy/cloudflare-pages/README.md, "Option C"):
+#   repository secrets CLOUDFLARE_API_TOKEN (permission: Account > Cloudflare Pages > Edit) and
+#   CLOUDFLARE_ACCOUNT_ID. Optional repository variable CF_PAGES_PROJECT (default: site-life-games).
+#   Until the secrets exist this workflow does nothing and stays green.
+# - Only public game files are uploaded (src/package_site.py builds dist/site/): no server, sources, tests or keys.
+name: Publish games (Cloudflare Pages)
+
+on:
+  push:
+    paths:
+      - "safety-game/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: ${{ vars.CF_PAGES_PROJECT || 'site-life-games' }}
+    steps:
+      - name: Cloudflare not set up yet
+        if: env.CF_TOKEN == ''
+        run: |
+          echo "::notice title=Cloudflare not set up::Add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets to publish a play link (safety-game/deploy/cloudflare-pages/README.md, Option C)."
+          echo "Cloudflare Pages is not set up yet: no link published. See safety-game/deploy/cloudflare-pages/README.md (Option C)." >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v4
+        if: env.CF_TOKEN != ''
+
+      - uses: actions/setup-node@v4
+        if: env.CF_TOKEN != ''
+        with:
+          node-version: "20"
+
+      - name: Collect the public game files
+        if: env.CF_TOKEN != ''
+        run: python3 safety-game/src/package_site.py
+
+      - name: Create the Pages project (first run only)
+        if: env.CF_TOKEN != ''
+        run: npx --yes wrangler@3 pages project create "$PROJECT" --production-branch=main || echo "Project already exists."
+
+      - name: Publish and print the play link
+        if: env.CF_TOKEN != ''
+        run: |
+          npx --yes wrangler@3 pages deploy safety-game/dist/site --project-name="$PROJECT" --branch="$GITHUB_REF_NAME" --commit-dirty=true 2>&1 | tee deploy.log
+          urls=$(grep -oE 'https://[A-Za-z0-9.-]+\.pages\.dev' deploy.log | sort -u)
+          [ -n "$urls" ] || { echo "No pages.dev link found in the wrangler output."; exit 1; }
+          {
+            echo "## Play link"
+            echo
+            echo "Branch \`$GITHUB_REF_NAME\`, commit \`${GITHUB_SHA::7}\`:"
+            echo
+            for u in $urls; do echo "- $u"; done
+            echo
+            echo "Games: \`index.html\` (factory), \`kids.html?world=home|school|market|water|online\`, \`little.html\`, \`warehouse.html\`, \`builder.html\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          for u in $urls; do echo "::notice title=Play link::$u"; done

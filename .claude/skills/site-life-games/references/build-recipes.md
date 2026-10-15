@@ -72,6 +72,7 @@ For something bigger (home alone, flood day, first-aid course), make a **new pag
 - [ ] Selector cards: factory start (`src/factory.html` `.games`), kids (`KID_CARDS` / `littleCard()` / `warehouseCard()` in `src/kids-game.js`), and the Little Stars and warehouse menus if they list games.
 - [ ] `src/build.py`: new page and offline copy, with offline link rewriting for every page that links to it.
 - [ ] `sw.js`: add the page to the precache list and **bump the cache version**.
+- [ ] `src/package_site.py`: add any new page (and its offline copy) to `PAGES`, so it is published to Cloudflare.
 - [ ] `src/scorm.py`: add a package line (`ALWAYS` set and list).
 - [ ] `server/sitelife_server.py`: game label and kids-game list, if it has one.
 - [ ] `SL.post({game:'<id>', …})` only after consent; for kids, `class` from `?class=`, `zoneTimes`, `missed`, `score`; certificate link via `SL.certLink`.
@@ -80,3 +81,4 @@ For something bigger (home alone, flood day, first-aid course), make a **new pag
 - [ ] Phone and desktop screenshots looked at; the player is never hidden (see the warehouse x-ray silhouette in `addXray()`).
 - [ ] Docs: `CLAUDE.md` games and files tables plus an architecture note; `docs/HANDOVER.md` games table and timeline; `ROADMAP.md`; `research/IDEAS.md`; `research/LOG.md`.
 - [ ] Rebuild, commit the generated pages too (CI fails otherwise), and push.
+- [ ] Play link: read it from the "Publish games (Cloudflare Pages)" run for your branch and give it to the owner (`references/publishing.md`).

@@ -40,6 +40,8 @@ Useful URL options: `?lang=pcm|yo|ha|ig`, `?site=sites/<file>.json` (or `?site=l
 | `server/sitelife_server.py` | Python stdlib server: games, `POST /api/result`, dashboard `/hse?key=…`, certificates `/cert/<id>`, `/verify/<id>`, rooms `/api/room/…`, `/trainer?room=` | ✅ |
 | `server/setup-ubuntu.sh`, `START-SERVER.bat`, `start-server.sh` | VPS install; local run | ✅ |
 | `deploy/google-sheets/`, `deploy/cloudflare-pages/` | No-server option: static hosting + results in a Google Sheet | ✅ |
+| `src/package_site.py`, `../.github/workflows/deploy-pages.yml` | Public files → `dist/site/` (marked `SL_STATIC_HOST`), published to Cloudflare Pages by GitHub on every push: a play link per branch | ✅ |
+| `SHARE-LINK.bat`, `share-link.sh` | Owner's PC: results server + `cloudflared` quick tunnel → random `trycloudflare.com` link | ✅ |
 | `research/` | Game ideas backlog, plans and research log | ✅ |
 | `tests/` | Playwright tests and server tests (see below) | ✅ |
 

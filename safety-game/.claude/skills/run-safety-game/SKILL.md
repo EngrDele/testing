@@ -66,6 +66,7 @@ EOF
 
 **Commands:**
 - `serve [port]`: start the results server with dashboard key `drive`, and use http from then on.
+- `base <url>`: load pages from another address, such as the static Cloudflare copy (`python3 src/package_site.py`, then `python3 -m http.server 8095 -d dist/site`). The full check is in `.claude/skills/site-life-games/references/publishing.md` at the repo root.
 - `open <page?query>`
 - `start [name]`: fills the name, ticks consent, spins the factory role, then presses Start.
 - `step [n] [dt]`: advances the game n frames of dt seconds, then renders.
@@ -78,6 +79,9 @@ EOF
 - **Factory and kids:** the globals `S` (state, `S.p` is the player), `ZONES`, `MISS`, `doAct()`.
 - **Warehouse:** `WH.*`, i.e. `state()`, `teleport(x, z)` in metres, `inspect(id)`, `correct()`, `hazards()`, `event(type)`.
 - **Little Stars:** `LS.*`, i.e. `play(ids)`, `tapId(id)`, `state()`.
+
+## Static copy (what Cloudflare Pages serves)
+`python3 src/package_site.py` writes `dist/site/` and marks the pages `SL_STATIC_HOST`. There, `SL.hasServer()` is `false`, so no `api/result` POST and no certificate link. On the results server it is `true`, and `SL.post` returns `{"status":"sent", id}` **once the privacy box is ticked**; without it, the status is `noconsent`.
 
 ## Results server (curl)
 ```bash
