@@ -118,13 +118,12 @@ Step 12 in detail:
 
 ## 5. Where we are (honest status)
 
-**Done and tested.** All of these play to the end in the automated tests with no page errors:
+**Done and tested.** GitHub CI (`.github/workflows/site-life.yml`) runs on every push to the branch and passed on the latest commit (13 Oct 2026). All of these play to the end in the automated tests with no page errors:
 - the factory, advanced, Oga, builder, five kids worlds and Little Stars games;
 - the server unit tests and smoke tests;
 - the accessibility, group-session, offline, SCORM and engine-extras tests.
 
 **Not yet verified in the real world:**
-- **CI on GitHub**: the workflow exists (`.github/workflows/site-life.yml`) but has not run yet, because the branch has no PR and pushes may not trigger it until merged.
 - **Real phones**: performance has not been measured on a low-end Android (the target is about 30 fps; there is an auto-Low watchdog).
 - **VR**: never tried on a headset.
 - **Group sessions in the claude.ai artifact**: only the server route has been tested.
@@ -148,7 +147,7 @@ Suggested next steps, in priority order:
 2. **Native-speaker review** of Pidgin, Yorùbá, Hausa and Igbo, and child-protection review of the Little Stars body-safety scene.
 3. **Recorded voice-overs** (Nigerian voices) for the kids games and Little Stars.
 4. **Real-device performance pass** on a cheap Android phone; a lower-poly `makeHuman` if needed.
-5. **Merge to `main`** and let CI run. Open a PR only when the owner asks.
+5. **Merge to `main`**. CI already passes on the branch. Open a PR only when the owner asks.
 6. **Builder v2**: movable gate, lane, car park and muster point; a library of scenarios by industry (oil and gas, construction, FMCG, hospitals).
 7. **New games** from `research/IDEAS.md`: gas cylinder at home, flood day, building site walk, tanker and petrol station, okada/keke rider course, hospital infection control, permit-to-work/H2S, office safety. The weekly routine builds one per week on its own branch, and the owner reviews and merges.
 8. **Realistic avatars and scans**: licensed glTF characters (`SL_AVATAR_URL`) and a Polycam scan of a client site (`placeSiteModel`).
