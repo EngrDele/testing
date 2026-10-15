@@ -2,6 +2,8 @@
 
 The `game-researcher` agent (`.claude/agents/game-researcher.md`) adds ideas here, picks one, plans it in `plans/` and builds it. The owner can add ideas too: write them under "Candidates" with your name.
 
+**Main players right now: the owner's children, aged 4, 8 and 12.** Give every kids idea an age (4, 8 or 12) and rotate between the ages. See `.claude/skills/site-life-games/references/ages.md` and `idea-bank.md`.
+
 ## Scoring (1–5 each, highest total wins)
 | Factor | 5 means |
 |---|---|

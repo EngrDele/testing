@@ -1,6 +1,8 @@
 # Site Life: project handover
 
-**Read this first if you are picking up the project** (human or AI agent). It explains what Site Life is, what has been built, how it was built, where it stands today and where it is heading. Then read, in this order:
+**Read this first if you are picking up the project** (human or AI agent). It explains what Site Life is, what has been built, how it was built, where it stands today and where it is heading. **To add or suggest games, use the skill `.claude/skills/site-life-games/`.** The main players are the owner's children, aged 4, 8 and 12.
+
+Then read, in this order:
 
 1. `../CLAUDE.md`: the technical guide (files, architecture, build, tests, gotchas). It is the source of truth for *how* to work on the code.
 2. `../ROADMAP.md`: status table and the next steps for each feature.

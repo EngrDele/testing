@@ -2,7 +2,7 @@
 
 Site Life is a set of browser-based 3D **safety training games** that replace the "watch a video, tick a paper quiz" induction. It is written in plain HTML and JavaScript, uses three.js r128 from a CDN, and has **no npm dependencies at runtime**. A small Python script (`src/build.py`) assembles the pages from sources.
 
-**New to the project? Start with `docs/HANDOVER.md`** (history, status, direction) and `docs/TRANSCRIPT.md` (the owner's conversation). Read `CONCEPT.md` for the product idea, `ROADMAP.md` for status and what is next, and `research/IDEAS.md` for the game backlog (a weekly routine runs `.claude/agents/game-researcher.md` to research, plan and build new games).
+**Adding or suggesting a game? Use the project skill `.claude/skills/site-life-games/`** (age guides for the main players, children aged 4, 8 and 12; build recipes; content rules; idea bank). **New to the project? Start with `docs/HANDOVER.md`** (history, status, direction) and `docs/TRANSCRIPT.md` (the owner's conversation). Read `CONCEPT.md` for the product idea, `ROADMAP.md` for status and what is next, and `research/IDEAS.md` for the game backlog (a weekly routine runs `.claude/agents/game-researcher.md` to research, plan and build new games).
 
 ## The games
 
